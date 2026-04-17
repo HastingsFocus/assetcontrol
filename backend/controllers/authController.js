@@ -51,9 +51,11 @@ export const registerUser = async (req, res) => {
     department: allowed.department,
   });
 
+  // 🔥 UPDATED RESPONSE (includes _id)
   res.status(201).json({
     message: "Registration successful",
     user: {
+      _id: user._id, // ✅ IMPORTANT FIX
       name: user.name,
       email: user.email,
       role: user.role,
@@ -89,10 +91,12 @@ export const loginUser = async (req, res) => {
     });
   }
 
+  // ✅ IMPORTANT FIX: include _id
   res.json({
     token: generateToken(user._id),
     user: {
-      name: user.name, // ✅ include name here too
+      _id: user._id, // 🔥 THIS FIXES YOUR SOCKET ISSUE
+      name: user.name,
       email: user.email,
       role: user.role,
       department: user.department,

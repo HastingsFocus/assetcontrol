@@ -20,14 +20,22 @@ export default function Login() {
     try {
       const res = await API.post("/auth/login", form);
 
+      // 🔥 STEP 1: SAVE USER + TOKEN
       localStorage.setItem("token", res.data.token);
       localStorage.setItem("user", JSON.stringify(res.data.user));
 
+      const user = res.data.user;
+
       alert("Login successful");
 
-      if (res.data.user.role === "admin") {
+      // 🔥 STEP 2: REDIRECT LOGIC (ONBOARDING FLOW)
+      if (user.role === "admin") {
         navigate("/admin");
-      } else {
+      } 
+      else if (!user.inventorySetupComplete) {
+        navigate("/setup-inventory");
+      } 
+      else {
         navigate("/dashboard");
       }
 

@@ -11,6 +11,7 @@ import Login from "./pages/Login";
 import Register from "./pages/Register";
 import Dashboard from "./pages/Dashboard";
 import AdminDashboard from "./pages/admin/AdminDashboard";
+import SetUpInventory from "./pages/SetUpInventory.jsx"; // 🔥 ADDED
 
 function App() {
 
@@ -27,7 +28,6 @@ function App() {
     socket.on("notification", (data) => {
       console.log("🔔 Notification:", data);
 
-      // ⚡ Show toast popup
       toast.info(data.message);
     });
 
@@ -40,12 +40,20 @@ function App() {
     <>
       <BrowserRouter>
         <Routes>
+          {/* 🔥 DEFAULT ROUTE */}
           <Route path="/" element={<Navigate to="/login" />} />
 
+          {/* AUTH */}
           <Route path="/login" element={<Login />} />
-          <Route path="/dashboard" element={<Dashboard />} />
           <Route path="/register" element={<Register />} />
 
+          {/* 🔥 INVENTORY SETUP ROUTE */}
+          <Route path="/setup-inventory" element={<SetUpInventory />} />
+
+          {/* DASHBOARD */}
+          <Route path="/dashboard" element={<Dashboard />} />
+
+          {/* ADMIN */}
           <Route path="/admin" element={<AdminDashboard />} />
         </Routes>
       </BrowserRouter>

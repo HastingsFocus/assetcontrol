@@ -14,14 +14,12 @@ const generateToken = (id) => {
 export const registerUser = async (req, res) => {
   const { name, email, password } = req.body;
 
-  // 🔍 Validate inputs
   if (!name || !email || !password) {
     return res.status(400).json({
       message: "Please provide name, email and password",
     });
   }
 
-  // 🔍 Check allowed list
   const allowed = allowedUsers.find((u) => u.email === email);
 
   if (!allowed) {
@@ -30,7 +28,6 @@ export const registerUser = async (req, res) => {
     });
   }
 
-  // ❗ Check if user already exists
   const userExists = await User.findOne({ email });
 
   if (userExists) {
@@ -39,27 +36,26 @@ export const registerUser = async (req, res) => {
     });
   }
 
-  // 🔒 Hash password
   const hashedPassword = await bcrypt.hash(password, 10);
 
-  // ✅ Create user
   const user = await User.create({
     name,
     email,
     password: hashedPassword,
     role: allowed.role,
     department: allowed.department,
+    inventorySetupComplete: false, // 🔥 IMPORTANT DEFAULT
   });
 
-  // 🔥 UPDATED RESPONSE (includes _id)
   res.status(201).json({
     message: "Registration successful",
     user: {
-      _id: user._id, // ✅ IMPORTANT FIX
+      _id: user._id,
       name: user.name,
       email: user.email,
       role: user.role,
       department: user.department,
+      inventorySetupComplete: user.inventorySetupComplete, // 🔥 ADD THIS
     },
   });
 };
@@ -68,7 +64,6 @@ export const registerUser = async (req, res) => {
 export const loginUser = async (req, res) => {
   const { email, password } = req.body;
 
-  // 🔍 Validate inputs
   if (!email || !password) {
     return res.status(400).json({
       message: "Please provide email and password",
@@ -91,15 +86,15 @@ export const loginUser = async (req, res) => {
     });
   }
 
-  // ✅ IMPORTANT FIX: include _id
   res.json({
-    token: generateToken(user._id),
+    token: generateToken(user), // 🔥 FIXED HERE
     user: {
-      _id: user._id, // 🔥 THIS FIXES YOUR SOCKET ISSUE
+      _id: user._id,
       name: user.name,
       email: user.email,
       role: user.role,
       department: user.department,
+      inventorySetupComplete: user.inventorySetupComplete,
     },
   });
 };

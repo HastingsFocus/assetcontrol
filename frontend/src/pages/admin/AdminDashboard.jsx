@@ -1,37 +1,40 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import AllRequests from "../../components/AllRequests";
+import InventoryOverview from "../../components/InventoryOverview";
 import socket from "../../socket";
 
 export default function AdminDashboard() {
-  const user = JSON.parse(localStorage.getItem("user"));
+  const user = JSON.parse(localStorage.getItem("user") || "{}");
   const navigate = useNavigate();
 
-  const [active, setActive] = useState("requests");
+  const [active, setActive] = useState("assets");
   const [notifications, setNotifications] = useState([]);
+
+  // 🔥 LOGOUT FUNCTION (REUSABLE LOGIC)
+  const handleLogout = () => {
+    localStorage.removeItem("token");
+    localStorage.removeItem("user");
+
+    socket.disconnect(); // 🔥 VERY IMPORTANT (prevents weird reconnect issues)
+
+    navigate("/login");
+  };
 
   // 🔥 SOCKET CONNECTION
   useEffect(() => {
     if (!user?._id) return;
 
-    console.log("🟢 Admin connecting to socket:", user._id);
-
     socket.emit("register", user._id);
 
     const handleNotification = (data) => {
-      console.log("🔥 Admin RECEIVED notification:", data);
-
-      // ✅ Add to notifications list
       setNotifications((prev) => [data, ...prev]);
-
-      // 🚀 OPTIONAL: instant alert (you can remove later)
       alert(`🔔 ${data.message}`);
     };
 
     socket.on("notification", handleNotification);
 
     return () => {
-      console.log("🔌 Admin socket cleanup");
       socket.off("notification", handleNotification);
     };
   }, [user]);
@@ -40,10 +43,7 @@ export default function AdminDashboard() {
   const handleViewRequest = (requestId) => {
     if (!requestId) return;
 
-    // switch to requests tab
     setActive("requests");
-
-    // pass requestId via URL
     navigate(`/admin?requestId=${requestId}`);
   };
 
@@ -57,56 +57,77 @@ export default function AdminDashboard() {
           background: "#111827",
           color: "white",
           padding: "20px",
+          display: "flex",
+          flexDirection: "column",
+          justifyContent: "space-between", // 🔥 PUSHES LOGOUT TO BOTTOM
         }}
       >
-        <h3>👤 {user?.name} (Admin)</h3>
+        {/* TOP SECTION */}
+        <div>
+          <h3>👤 {user?.name} (Admin)</h3>
 
-        <hr />
+          <hr />
 
-        <div
+          <div
+            style={{
+              marginTop: "20px",
+              display: "flex",
+              flexDirection: "column",
+              gap: "15px",
+            }}
+          >
+            <button onClick={() => setActive("assets")}>
+              📊 Inventory Overview
+            </button>
+
+            <button onClick={() => setActive("requests")}>
+              📦 All Requests
+            </button>
+
+            <button onClick={() => setActive("reports")}>
+              📈 Condition Reports
+            </button>
+
+            <button onClick={() => setActive("notifications")}>
+              🔔 Notifications
+              {notifications.length > 0 && (
+                <span
+                  style={{
+                    marginLeft: "10px",
+                    background: "red",
+                    padding: "2px 8px",
+                    borderRadius: "20px",
+                    fontSize: "12px",
+                  }}
+                >
+                  {notifications.length}
+                </span>
+              )}
+            </button>
+          </div>
+        </div>
+
+        {/* 🔴 LOGOUT BUTTON (BOTTOM) */}
+        <button
+          onClick={handleLogout}
           style={{
-            marginTop: "20px",
-            display: "flex",
-            flexDirection: "column",
-            gap: "15px",
+            background: "#dc2626",
+            color: "white",
+            border: "none",
+            padding: "10px",
+            borderRadius: "6px",
+            cursor: "pointer",
           }}
         >
-          <button onClick={() => setActive("requests")}>
-            📦 All Requests
-          </button>
-
-          <button onClick={() => setActive("assets")}>
-            🪑 Manage Assets
-          </button>
-
-          <button onClick={() => setActive("reports")}>
-            📊 Condition Reports
-          </button>
-
-          {/* 🔔 NOTIFICATIONS TAB */}
-          <button onClick={() => setActive("notifications")}>
-            🔔 Notifications
-            {notifications.length > 0 && (
-              <span
-                style={{
-                  marginLeft: "10px",
-                  background: "red",
-                  padding: "2px 8px",
-                  borderRadius: "20px",
-                  fontSize: "12px",
-                }}
-              >
-                {notifications.length}
-              </span>
-            )}
-          </button>
-        </div>
+          🚪 Logout
+        </button>
       </div>
 
-      {/* 🟩 MAIN */}
+      {/* 🟩 MAIN CONTENT */}
       <div style={{ flex: 1, padding: "20px" }}>
 
-        {/* 📦 REQUESTS */}
+        {active === "assets" && <InventoryOverview />}
+
         {active === "requests" && (
           <AllRequests
             highlightId={
@@ -115,13 +136,10 @@ export default function AdminDashboard() {
           />
         )}
 
-        {/* 🪑 ASSETS */}
-        {active === "assets" && <h2>🪑 Manage Assets</h2>}
+        {active === "reports" && (
+          <h2>📈 Condition Reports (Coming Soon)</h2>
+        )}
 
-        {/* 📊 REPORTS */}
-        {active === "reports" && <h2>📊 Condition Reports</h2>}
-
-        {/* 🔔 NOTIFICATIONS */}
         {active === "notifications" && (
           <div>
             <h2>🔔 Notifications</h2>
@@ -144,7 +162,6 @@ export default function AdminDashboard() {
                 >
                   <span>{n.message}</span>
 
-                  {/* 🔥 VIEW MORE BUTTON */}
                   {n.request && (
                     <button
                       onClick={() => handleViewRequest(n.request)}

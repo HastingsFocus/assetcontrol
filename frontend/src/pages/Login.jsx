@@ -14,6 +14,29 @@ export default function Login() {
     setForm({ ...form, [e.target.name]: e.target.value });
   };
 
+  // 🔥 STEP 2: CHECK SETUP + REDIRECT LOGIC
+  const checkSetupAndRedirect = async (user) => {
+    try {
+      // Admin goes straight to admin dashboard
+      if (user.role === "admin") {
+        navigate("/admin");
+        return;
+      }
+
+      // 🔥 Check if inventory is already setup
+      const res = await API.get("/items/check-setup");
+
+      if (res.data.isSetup) {
+        navigate("/dashboard"); // ✅ NORMAL FLOW
+      } else {
+        navigate("/setup-inventory"); // 🚨 FIRST TIME ONLY
+      }
+    } catch (err) {
+      console.error("Setup check failed:", err);
+      navigate("/dashboard"); // fallback safety
+    }
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
 
@@ -24,20 +47,10 @@ export default function Login() {
       localStorage.setItem("token", res.data.token);
       localStorage.setItem("user", JSON.stringify(res.data.user));
 
-      const user = res.data.user;
-
       alert("Login successful");
 
-      // 🔥 STEP 2: REDIRECT LOGIC (ONBOARDING FLOW)
-      if (user.role === "admin") {
-        navigate("/admin");
-      } 
-      else if (!user.inventorySetupComplete) {
-        navigate("/setup-inventory");
-      } 
-      else {
-        navigate("/dashboard");
-      }
+      // 🔥 STEP 2: REDIRECT USING BACKEND CHECK
+      await checkSetupAndRedirect(res.data.user);
 
     } catch (error) {
       alert(error.response?.data?.message || "Login failed");
@@ -65,7 +78,6 @@ export default function Login() {
         <button type="submit">Login</button>
       </form>
 
-      {/* 🔥 REGISTER LINK */}
       <p style={{ marginTop: "10px" }}>
         Don’t have an account?{" "}
         <Link to="/register" style={{ color: "blue" }}>

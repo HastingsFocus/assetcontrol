@@ -12,6 +12,7 @@ import Register from "./pages/Register";
 import Dashboard from "./pages/Dashboard";
 import AdminDashboard from "./pages/admin/AdminDashboard";
 import SetUpInventory from "./pages/SetUpInventory.jsx"; // 🔥 ADDED
+import EditInventory from "./pages/EditInventory";
 
 function App() {
 
@@ -52,6 +53,7 @@ function App() {
 
           {/* DASHBOARD */}
           <Route path="/dashboard" element={<Dashboard />} />
+          <Route path="/edit-inventory" element={<EditInventory />} />
 
           {/* ADMIN */}
           <Route path="/admin" element={<AdminDashboard />} />

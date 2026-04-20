@@ -33,7 +33,7 @@ app.get("/", (req, res) => {
   res.send("API Running...");
 });
 
-// 🔥 CORRECT SOCKET INTEGRATION
+// 🔥 SOCKET INITIALIZATION (ONLY ONCE)
 const server = initSocket(app);
 
 const PORT = process.env.PORT || 5000;

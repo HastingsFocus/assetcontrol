@@ -3,14 +3,22 @@ import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import allowedUsers from "../config/allowedUsers.js";
 
-// 🔐 Generate Token
-const generateToken = (id) => {
-  return jwt.sign({ id }, process.env.JWT_SECRET, {
-    expiresIn: "7d",
-  });
+// 🔐 Generate Token (FIXED)
+const generateToken = (user) => {
+  return jwt.sign(
+    {
+      id: user._id,
+      role: user.role,
+      department: user.department,
+    },
+    process.env.JWT_SECRET,
+    { expiresIn: "7d" }
+  );
 };
 
+// ======================
 // ✅ REGISTER
+// ======================
 export const registerUser = async (req, res) => {
   const { name, email, password } = req.body;
 
@@ -44,10 +52,10 @@ export const registerUser = async (req, res) => {
     password: hashedPassword,
     role: allowed.role,
     department: allowed.department,
-    inventorySetupComplete: false, // 🔥 IMPORTANT DEFAULT
+    inventorySetupComplete: false,
   });
 
-  res.status(201).json({
+  return res.status(201).json({
     message: "Registration successful",
     user: {
       _id: user._id,
@@ -55,12 +63,14 @@ export const registerUser = async (req, res) => {
       email: user.email,
       role: user.role,
       department: user.department,
-      inventorySetupComplete: user.inventorySetupComplete, // 🔥 ADD THIS
+      inventorySetupComplete: user.inventorySetupComplete,
     },
   });
 };
 
-// ✅ LOGIN
+// ======================
+// ✅ LOGIN (FIXED)
+// ======================
 export const loginUser = async (req, res) => {
   const { email, password } = req.body;
 
@@ -86,8 +96,11 @@ export const loginUser = async (req, res) => {
     });
   }
 
-  res.json({
-    token: generateToken(user), // 🔥 FIXED HERE
+  // 🔥 TOKEN (NOW INCLUDES ROLE + DEPARTMENT)
+  const token = generateToken(user);
+
+  return res.json({
+    token,
     user: {
       _id: user._id,
       name: user.name,

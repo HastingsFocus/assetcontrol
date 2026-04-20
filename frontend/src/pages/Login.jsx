@@ -14,26 +14,27 @@ export default function Login() {
     setForm({ ...form, [e.target.name]: e.target.value });
   };
 
-  // 🔥 STEP 2: CHECK SETUP + REDIRECT LOGIC
+  // 🔥 REDIRECT LOGIC
   const checkSetupAndRedirect = async (user) => {
     try {
-      // Admin goes straight to admin dashboard
+      // 🟢 ADMIN FLOW
       if (user.role === "admin") {
         navigate("/admin");
         return;
       }
 
-      // 🔥 Check if inventory is already setup
+      // 🔥 IMPORTANT: user-specific check
       const res = await API.get("/items/check-setup");
 
       if (res.data.isSetup) {
-        navigate("/dashboard"); // ✅ NORMAL FLOW
+        navigate("/dashboard");
       } else {
-        navigate("/setup-inventory"); // 🚨 FIRST TIME ONLY
+        navigate("/setup-inventory");
       }
+
     } catch (err) {
       console.error("Setup check failed:", err);
-      navigate("/dashboard"); // fallback safety
+      navigate("/dashboard"); // safety fallback
     }
   };
 
@@ -43,13 +44,13 @@ export default function Login() {
     try {
       const res = await API.post("/auth/login", form);
 
-      // 🔥 STEP 1: SAVE USER + TOKEN
+      // 🔐 SAVE AUTH DATA
       localStorage.setItem("token", res.data.token);
       localStorage.setItem("user", JSON.stringify(res.data.user));
 
       alert("Login successful");
 
-      // 🔥 STEP 2: REDIRECT USING BACKEND CHECK
+      // 🚀 ROUTE USER PROPERLY
       await checkSetupAndRedirect(res.data.user);
 
     } catch (error) {

@@ -1,78 +1,208 @@
 import { useEffect, useState } from "react";
 import API from "../services/api";
-import { useNavigate } from "react-router-dom";
 
 export default function EditInventory() {
-  const navigate = useNavigate();
+  const [items, setItems] = useState([]);
+  const [itemTypes, setItemTypes] = useState([]);
 
-  const [form, setForm] = useState({
-    name: "",
-    department: "",
-    location: "",
-  });
-
-  // 🔥 LOAD EXISTING INVENTORY (setup data)
+  // =========================
+  // 🔥 LOAD INVENTORY + TYPES
+  // =========================
   useEffect(() => {
-    const fetchInventory = async () => {
-      try {
-        const res = await API.get("/items/setup"); 
-        setForm(res.data);
-      } catch (err) {
-        console.log("Error loading inventory", err);
-      }
-    };
-
     fetchInventory();
+    fetchTypes();
   }, []);
 
-  const handleChange = (e) => {
-    setForm({ ...form, [e.target.name]: e.target.value });
+  const fetchInventory = async () => {
+    try {
+      const res = await API.get("/items/my-inventory");
+
+      console.log("🔥 INVENTORY DATA:", res.data);
+
+      setItems(res.data);
+    } catch (err) {
+      console.log("Error loading inventory", err);
+    }
   };
 
-  // 🔥 UPDATE INVENTORY
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-
+  const fetchTypes = async () => {
     try {
-      await API.put("/items/setup", form); // update existing setup
+      const res = await API.get("/items/types");
+      setItemTypes(res.data);
+    } catch (err) {
+      console.log(err);
+    }
+  };
 
-      alert("Inventory updated successfully");
+  // =========================
+  // ➕ ADD NEW ITEM
+  // =========================
+  const addNewItem = () => {
+    setItems([
+      ...items,
+      {
+        _id: null,
+        itemType: "",
+        conditions: { good: 0, fair: 0, poor: 0 },
+      },
+    ]);
+  };
 
-      navigate("/dashboard");
+  // =========================
+  // 🔄 ITEM TYPE CHANGE
+  // =========================
+  const handleItemTypeChange = (index, value) => {
+    const updated = [...items];
+    updated[index].itemType = value;
+    setItems(updated);
+  };
+
+  // =========================
+  // 🔄 CONDITIONS CHANGE
+  // =========================
+  const handleConditionChange = (index, type, value) => {
+    const updated = [...items];
+    updated[index].conditions[type] = Number(value);
+    setItems(updated);
+  };
+
+  // =========================
+  // 💾 UPDATE ITEM
+  // =========================
+  const handleUpdate = async (item) => {
+    try {
+      await API.put(`/items/my-item/${item._id}`, {
+        itemType: item.itemType._id || item.itemType,
+        conditions: item.conditions,
+      });
+
+      alert("Item updated successfully");
     } catch (err) {
       console.log(err);
       alert("Update failed");
     }
   };
 
+  // =========================
+  // 🗑️ DELETE ITEM
+  // =========================
+  const handleDelete = async (id) => {
+    try {
+      await API.delete(`/items/my-item/${id}`);
+
+      setItems(items.filter((item) => item._id !== id));
+
+      alert("Item deleted");
+    } catch (err) {
+      console.log(err);
+      alert("Delete failed");
+    }
+  };
+
+  // =========================
+  // UI
+  // =========================
   return (
     <div style={{ padding: "20px" }}>
-      <h2>✏️ Edit Inventory Setup</h2>
+      <h2>✏️ Manage Inventory</h2>
 
-      <form onSubmit={handleSubmit}>
-        <input
-          name="name"
-          placeholder="Inventory Name"
-          value={form.name}
-          onChange={handleChange}
-        />
+      {items.length === 0 ? (
+        <p>No inventory found</p>
+      ) : (
+        items.map((item, index) => (
+          <div
+            key={item._id || index}
+            style={{
+              border: "1px solid #ccc",
+              padding: "15px",
+              marginBottom: "15px",
+              borderRadius: "10px",
+              background: "#f9f9f9",
+            }}
+          >
+            {/* ITEM TYPE */}
+            <select
+              value={item.itemType?._id || item.itemType}
+              onChange={(e) =>
+                handleItemTypeChange(index, e.target.value)
+              }
+            >
+              <option value="">Select Item</option>
+              {itemTypes.map((t) => (
+                <option key={t._id} value={t._id}>
+                  {t.name}
+                </option>
+              ))}
+            </select>
 
-        <input
-          name="department"
-          placeholder="Department"
-          value={form.department}
-          onChange={handleChange}
-        />
+            <br /><br />
 
-        <input
-          name="location"
-          placeholder="Location"
-          value={form.location}
-          onChange={handleChange}
-        />
+            {/* CONDITIONS */}
+            <div>
+              <label>Good: </label>
+              <input
+                type="number"
+                value={item.conditions?.good || 0}
+                onChange={(e) =>
+                  handleConditionChange(index, "good", e.target.value)
+                }
+              />
 
-        <button type="submit">Save Changes</button>
-      </form>
+              <label style={{ marginLeft: 10 }}>Fair: </label>
+              <input
+                type="number"
+                value={item.conditions?.fair || 0}
+                onChange={(e) =>
+                  handleConditionChange(index, "fair", e.target.value)
+                }
+              />
+
+              <label style={{ marginLeft: 10 }}>Poor: </label>
+              <input
+                type="number"
+                value={item.conditions?.poor || 0}
+                onChange={(e) =>
+                  handleConditionChange(index, "poor", e.target.value)
+                }
+              />
+            </div>
+
+            <br />
+
+            {/* TOTAL */}
+            <strong>
+              Total:{" "}
+              {(item.conditions?.good || 0) +
+                (item.conditions?.fair || 0) +
+                (item.conditions?.poor || 0)}
+            </strong>
+
+            <br /><br />
+
+            {/* ACTIONS */}
+            <button onClick={() => handleUpdate(item)}>
+              💾 Save
+            </button>
+
+            {item._id && (
+              <button
+                onClick={() => handleDelete(item._id)}
+                style={{
+                  marginLeft: 10,
+                  background: "red",
+                  color: "white",
+                }}
+              >
+                🗑️ Delete
+              </button>
+            )}
+          </div>
+        ))
+      )}
+
+      {/* ADD NEW ITEM */}
+      <br />
+      <button onClick={addNewItem}>➕ Add Item</button>
     </div>
   );
 }

@@ -1,7 +1,7 @@
 import Item from "../models/Item.js";
 import ItemType from "../models/ItemType.js";
 import User from "../models/User.js";
-import { broadcastInventoryUpdate } from "../socket.js"; // ✅ CORRECT IMPORT
+import { broadcastInventoryUpdate } from "../socket.js";
 
 // ==========================
 // ✅ GET ITEM TYPES (FILTERED BY DEPARTMENT)
@@ -22,20 +22,25 @@ export const getItemTypes = async (req, res) => {
 };
 
 // ==========================
-// ✅ SETUP INVENTORY (REAL-TIME ENABLED)
+// ✅ SETUP INVENTORY
 // ==========================
 export const setupInventory = async (req, res) => {
   try {
-    // 🚫 block admin
     if (req.user.role === "admin") {
       return res.status(403).json({
-        message: "Admin cannot setup inventory"
+        message: "Admin cannot manage inventory"
       });
     }
 
-    const items = req.body.items;
+    const { items } = req.body;
 
-    // 🚫 duplicate check
+    if (!items || items.length === 0) {
+      return res.status(400).json({
+        message: "No items provided"
+      });
+    }
+
+    // 🚫 duplicate protection
     const ids = items.map(i => i.itemType);
     if (ids.length !== new Set(ids).size) {
       return res.status(400).json({
@@ -43,15 +48,7 @@ export const setupInventory = async (req, res) => {
       });
     }
 
-    // 🚫 prevent multiple setups
-    const existing = await Item.find({ owner: req.user.id });
-    if (existing.length > 0) {
-      return res.status(400).json({
-        message: "Inventory already setup"
-      });
-    }
-
-    // 🔥 validation
+    // 🔥 VALIDATION
     for (let item of items) {
       const good = item.conditions?.good || 0;
       const fair = item.conditions?.fair || 0;
@@ -64,50 +61,62 @@ export const setupInventory = async (req, res) => {
       }
     }
 
-    // ✅ create items
-    const newItems = items.map(item => ({
-      itemType: item.itemType,
-      conditions: {
-        good: item.conditions?.good || 0,
-        fair: item.conditions?.fair || 0,
-        poor: item.conditions?.poor || 0,
-      },
-      owner: req.user.id,
-      department: req.user.department
-    }));
+    // 🔥 DELETE ONLY THIS USER’S OLD INVENTORY
+    await Item.deleteMany({ owner: req.user.id });
 
-    await Item.insertMany(newItems);
+    // 🔥 FORMAT DATA
+    const formatted = items.map((item) => {
+      const good = item.conditions?.good || 0;
+      const fair = item.conditions?.fair || 0;
+      const poor = item.conditions?.poor || 0;
 
-    // ✅ mark setup complete
+      return {
+        itemType: item.itemType,
+        owner: req.user.id, // ✅ FIXED
+        department: req.user.department,
+        conditions: {
+          good,
+          fair,
+          poor,
+        },
+        totalQuantity: good + fair + poor,
+      };
+    });
+
+    // ✅ SAVE
+    await Item.insertMany(formatted);
+
+    // ✅ MARK USER
     await User.findByIdAndUpdate(req.user.id, {
-      inventorySetupComplete: true
+      inventorySetupComplete: true,
     });
 
-    // 🔥🔥🔥 REAL-TIME BROADCAST
+    // 🔥 REAL-TIME UPDATE
     broadcastInventoryUpdate({
-      message: "New inventory submitted",
+      message: "Inventory updated",
       department: req.user.department,
-      user: req.user.id
+      owner: req.user.id, // ✅ FIXED
     });
 
-    console.log("📡 Inventory broadcast sent");
+    console.log("📡 Inventory update broadcast sent");
 
-    res.json({ message: "Inventory setup complete" });
+    res.json({ message: "Inventory saved successfully" });
 
-  } catch (err) {
-    console.error("❌ SETUP ERROR:", err);
-    res.status(500).json({ message: err.message });
+  } catch (error) {
+    console.error("❌ INVENTORY SAVE ERROR:", error);
+    res.status(500).json({ message: "Failed to save inventory" });
   }
 };
 
-
-
+// ==========================
+// ❌ REMOVE THIS (DANGEROUS)
+// ==========================
+// This updates ALL items in DB 😬
+// DELETE this function completely
+/*
 export const setupInventoryUpdate = async (req, res) => {
   try {
-    const updated = await Item.updateMany(
-      {}, 
-      { $set: req.body }
-    );
+    const updated = await Item.updateMany({}, { $set: req.body });
 
     res.json({
       message: "Inventory updated successfully",
@@ -117,14 +126,28 @@ export const setupInventoryUpdate = async (req, res) => {
     res.status(500).json({ message: "Update failed" });
   }
 };
+*/
+
+// ==========================
+// ✅ GET MY INVENTORY
+// ==========================
+export const getMyInventory = async (req, res) => {
+  try {
+    const items = await Item.find({ owner: req.user.id }) // ✅ FIXED
+      .populate("itemType", "name");
+
+    res.json(items);
+  } catch (error) {
+    console.error("❌ GET MY INVENTORY ERROR:", error);
+    res.status(500).json({ message: "Failed to fetch inventory" });
+  }
+};
 
 // ==========================
 // ✅ ADMIN: GET ALL INVENTORY
 // ==========================
 export const getAllInventory = async (req, res) => {
   try {
-    console.log("🔥 USER ACCESSING INVENTORY:", req.user);
-
     if (!["admin", "hod"].includes(req.user.role)) {
       return res.status(403).json({ message: "Not allowed" });
     }
@@ -133,14 +156,15 @@ export const getAllInventory = async (req, res) => {
       .populate("owner", "email department")
       .populate("itemType", "name");
 
-    console.log("🔥 ITEMS FOUND:", items.length);
-
+    // 🔥 ENRICH DATA (THIS IS YOUR INTEGRATION)
     const enriched = items.map(item => {
       const c = item.conditions || {};
 
       return {
         ...item.toObject(),
-        totalQuantity: (c.good || 0) + (c.fair || 0) + (c.poor || 0)
+        department: item.department || item.owner?.department, // ✅ FIX
+        itemTypeName: item.itemType?.name, // ✅ easier frontend
+        totalQuantity: (c.good || 0) + (c.fair || 0) + (c.poor || 0),
       };
     });
 
@@ -153,7 +177,33 @@ export const getAllInventory = async (req, res) => {
 };
 
 // ==========================
-// ✅ ADMIN: UPDATE CONDITIONS
+// ✅ UPDATE ITEM (USER SAFE)
+// ==========================
+export const updateMyItem = async (req, res) => {
+  try {
+    const item = await Item.findOne({
+      _id: req.params.id,
+      owner: req.user.id, // ✅ FIXED
+    });
+
+    if (!item) {
+      return res.status(404).json({ message: "Item not found" });
+    }
+
+    Object.assign(item, req.body);
+    item.lastUpdated = Date.now();
+
+    await item.save();
+
+    res.json(item);
+  } catch (error) {
+    console.error("❌ UPDATE MY ITEM ERROR:", error);
+    res.status(500).json({ message: "Update failed" });
+  }
+};
+
+// ==========================
+// ✅ ADMIN UPDATE CONDITION
 // ==========================
 export const updateCondition = async (req, res) => {
   try {
@@ -177,5 +227,23 @@ export const updateCondition = async (req, res) => {
   } catch (err) {
     console.error("❌ UPDATE CONDITION ERROR:", err);
     res.status(500).json({ message: err.message });
+  }
+};
+
+export const deleteMyItem = async (req, res) => {
+  try {
+    const item = await Item.findOneAndDelete({
+      _id: req.params.id,
+      owner: req.user.id,
+    });
+
+    if (!item) {
+      return res.status(404).json({ message: "Item not found" });
+    }
+
+    res.json({ message: "Item deleted successfully" });
+  } catch (err) {
+    console.error("DELETE ERROR:", err);
+    res.status(500).json({ message: "Delete failed" });
   }
 };

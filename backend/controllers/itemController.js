@@ -8,16 +8,22 @@ import { broadcastInventoryUpdate } from "../socket.js";
 // ==========================
 export const getItemTypes = async (req, res) => {
   try {
-    const dept = req.user.department?.trim();
+    const dept = req.user.department;
+
+    if (!dept) {
+      return res.status(400).json({
+        message: "User department not found",
+      });
+    }
 
     const types = await ItemType.find({
-      departments: { $in: [dept] }
-    });
+      departments: { $in: [dept] },
+    }).select("name departments");
 
     res.json(types);
   } catch (err) {
-    console.error("❌ ERROR IN getItemTypes:", err);
-    res.status(500).json({ message: err.message });
+    console.error("❌ ERROR:", err);
+    res.status(500).json({ message: "Failed to fetch item types" });
   }
 };
 
@@ -108,25 +114,7 @@ export const setupInventory = async (req, res) => {
   }
 };
 
-// ==========================
-// ❌ REMOVE THIS (DANGEROUS)
-// ==========================
-// This updates ALL items in DB 😬
-// DELETE this function completely
-/*
-export const setupInventoryUpdate = async (req, res) => {
-  try {
-    const updated = await Item.updateMany({}, { $set: req.body });
 
-    res.json({
-      message: "Inventory updated successfully",
-      updated,
-    });
-  } catch (err) {
-    res.status(500).json({ message: "Update failed" });
-  }
-};
-*/
 
 // ==========================
 // ✅ GET MY INVENTORY

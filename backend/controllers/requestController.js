@@ -1,15 +1,18 @@
 import Request from "../models/Request.js";
 import User from "../models/User.js";
 import Notification from "../models/Notification.js";
+import ItemType from "../models/ItemType.js"; // 🔥 IMPORTANT FIX
 import { sendNotification } from "../socket.js";
 
+// ===============================
 // ✅ CREATE REQUEST (HOD)
+// ===============================
 export const createRequest = async (req, res) => {
   try {
-    const { itemName, requiredDate, quantity, priority } = req.body;
+    const { itemType, requiredDate, quantity, priority } = req.body;
 
     // ✅ Validation
-    if (!itemName || !requiredDate || !quantity || !priority) {
+    if (!itemType || !requiredDate || !quantity || !priority) {
       return res.status(400).json({
         message: "All fields are required",
       });
@@ -17,10 +20,26 @@ export const createRequest = async (req, res) => {
 
     console.log("🔥 Creating request...");
 
+    // 🔐 SECURITY CHECK: VALIDATE ITEM TYPE + DEPARTMENT
+    const type = await ItemType.findById(itemType);
+
+    if (!type) {
+      return res.status(404).json({
+        message: "Item type not found",
+      });
+    }
+
+    if (!type.departments.includes(req.user.department)) {
+      return res.status(403).json({
+        message: "Item not allowed for your department",
+      });
+    }
+
     // ✅ Create request
     const request = await Request.create({
       user: req.user._id,
-      itemName,
+      itemType,
+      itemName: type.name, // 🔥 derive name from DB (clean + safe)
       requiredDate,
       quantity,
       priority,
@@ -32,27 +51,21 @@ export const createRequest = async (req, res) => {
 
     console.log("👥 Admins found:", admins.length);
 
-    if (admins.length === 0) {
-      console.log("⚠️ No admins found — no notifications will be sent");
-    }
-
     // 🔥 NOTIFY ADMINS
     for (const admin of admins) {
       console.log("📢 Notifying admin:", admin._id);
 
-      // 💾 Save notification (UPDATED 🔥)
       await Notification.create({
         user: admin._id,
-        message: `New request for ${itemName}`,
+        message: `New request for ${type.name}`,
         type: "request_created",
-        request: request._id, // ✅ LINK TO REQUEST
+        request: request._id,
       });
 
-      // ⚡ Real-time notification
       sendNotification(admin._id, {
-        message: `New request for ${itemName}`,
+        message: `New request for ${type.name}`,
         type: "request_created",
-        request: request._id, // ✅ send to frontend too
+        request: request._id,
       });
     }
 
@@ -69,7 +82,9 @@ export const createRequest = async (req, res) => {
   }
 };
 
+// ===============================
 // ✅ GET MY REQUESTS (HOD)
+// ===============================
 export const getMyRequests = async (req, res) => {
   try {
     const requests = await Request.find({ user: req.user._id })
@@ -82,39 +97,66 @@ export const getMyRequests = async (req, res) => {
   }
 };
 
+// ===============================
 // ✅ GET ALL REQUESTS (ADMIN)
+// ===============================
 export const getAllRequests = async (req, res) => {
   try {
     const requests = await Request.find()
-      .populate("user", "name email department")
+      .populate({
+        path: "user",
+        select: "name email department",
+      })
+      .populate({
+        path: "itemType",
+        select: "name",
+      })
       .sort({ createdAt: -1 });
 
-    res.json(requests);
+    // 🔥 safety cleanup (prevents frontend crash)
+    const safeRequests = requests.map((r) => ({
+      ...r.toObject(),
+      user: r.user || {
+        name: "Unknown",
+        email: "Unknown",
+        department: "Unknown",
+      },
+      itemType: r.itemType || { name: "Deleted Item" },
+    }));
+
+    res.json(safeRequests);
   } catch (error) {
     console.error("❌ getAllRequests error:", error);
-    res.status(500).json({ message: "Server error" });
+    res.status(500).json({
+      message: error.message || "Server error in getAllRequests",
+    });
   }
 };
 
+// ===============================
 // ✅ UPDATE STATUS (ADMIN)
+// ===============================
 export const updateRequestStatus = async (req, res) => {
   try {
     const { status } = req.body;
 
-    // ✅ Validate status
     const validStatuses = ["pending", "approved", "rejected"];
+
     if (!validStatuses.includes(status)) {
-      return res.status(400).json({ message: "Invalid status" });
+      return res.status(400).json({
+        message: "Invalid status",
+      });
     }
 
-    // ✅ Find request
-    const request = await Request.findById(req.params.id);
+    const request = await Request.findById(req.params.id)
+      .populate("itemType", "name");
 
     if (!request) {
-      return res.status(404).json({ message: "Request not found" });
+      return res.status(404).json({
+        message: "Request not found",
+      });
     }
 
-    // ❌ Prevent duplicate update
     if (request.status === status) {
       return res.status(400).json({
         message: `Request is already ${status}`,
@@ -123,31 +165,27 @@ export const updateRequestStatus = async (req, res) => {
 
     console.log("🔄 Updating request status...");
 
-    // ✅ Update status
     request.status = status;
     await request.save();
 
-    // 🔥 NOTIFY USER
     const message =
       status === "approved"
-        ? `Your request for ${request.itemName} was approved`
-        : `Your request for ${request.itemName} was rejected`;
+        ? `Your request for ${request.itemType.name} was approved`
+        : `Your request for ${request.itemType.name} was rejected`;
 
     console.log("📢 Notifying user:", request.user);
 
-    // 💾 Save notification (UPDATED 🔥)
     await Notification.create({
       user: request.user,
       message,
       type: "status_updated",
-      request: request._id, // ✅ LINK TO REQUEST
+      request: request._id,
     });
 
-    // ⚡ Real-time notification
     sendNotification(request.user, {
       message,
       type: "status_updated",
-      request: request._id, // ✅ send to frontend
+      request: request._id,
     });
 
     res.json({

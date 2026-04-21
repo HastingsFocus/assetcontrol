@@ -8,6 +8,12 @@ const requestSchema = new mongoose.Schema(
       required: true,
     },
 
+    itemType: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "ItemType",
+      required: true,
+    },
+
     itemName: {
       type: String,
       required: true,

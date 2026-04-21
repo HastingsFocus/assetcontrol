@@ -5,13 +5,12 @@ export default function AllRequests() {
   const [requests, setRequests] = useState([]);
   const [selected, setSelected] = useState(null);
 
-  // 🔄 Fetch all requests
   const fetchRequests = async () => {
     try {
       const res = await API.get("/requests");
       setRequests(res.data);
     } catch (error) {
-      console.log(error);
+      console.log("❌ Fetch error:", error);
     }
   };
 
@@ -19,18 +18,13 @@ export default function AllRequests() {
     fetchRequests();
   }, []);
 
-  // ✅ Update request status
   const updateStatus = async (id, status) => {
     try {
       const res = await API.put(`/requests/${id}`, { status });
-
-      // 🔥 Update modal instantly
       setSelected(res.data.request);
-
-      // 🔄 Refresh table
       fetchRequests();
     } catch (err) {
-      console.log(err);
+      console.log("❌ Update error:", err);
     }
   };
 
@@ -38,12 +32,7 @@ export default function AllRequests() {
     <div>
       <h2>📦 All Requests</h2>
 
-      {/* TABLE */}
-      <table
-        border="1"
-        cellPadding="10"
-        style={{ width: "100%", marginTop: "20px" }}
-      >
+      <table border="1" cellPadding="10" style={{ width: "100%", marginTop: "20px" }}>
         <thead>
           <tr>
             <th>Item</th>
@@ -59,30 +48,20 @@ export default function AllRequests() {
           {requests.map((req) => (
             <tr key={req._id}>
               <td>{req.itemName}</td>
-              <td>{req.user?.department}</td>
+              <td>{req.user?.department || "N/A"}</td>
               <td>{req.quantity}</td>
               <td>{req.priority}</td>
               <td>{req.status}</td>
               <td>
-                <button onClick={() => setSelected(req)}>
-                  View
-                </button>
+                <button onClick={() => setSelected(req)}>View</button>
               </td>
             </tr>
           ))}
         </tbody>
       </table>
 
-      {/* 🔍 MODAL / DETAILS VIEW */}
       {selected && (
-        <div
-          style={{
-            marginTop: "20px",
-            padding: "20px",
-            border: "1px solid #ccc",
-            background: "#f9f9f9",
-          }}
-        >
+        <div style={{ marginTop: 20, padding: 20, border: "1px solid #ccc" }}>
           <h3>Request Details</h3>
 
           <p><strong>Item:</strong> {selected.itemName}</p>
@@ -92,7 +71,6 @@ export default function AllRequests() {
           <p><strong>Quantity:</strong> {selected.quantity}</p>
           <p><strong>Priority:</strong> {selected.priority}</p>
 
-          {/* ✅ STATUS WITH COLOR */}
           <p>
             <strong>Status:</strong>{" "}
             <span
@@ -112,11 +90,12 @@ export default function AllRequests() {
 
           <p>
             <strong>Required Date:</strong>{" "}
-            {new Date(selected.requiredDate).toDateString()}
+            {selected.requiredDate
+              ? new Date(selected.requiredDate).toDateString()
+              : "N/A"}
           </p>
 
-          {/* ✅ ACTION BUTTONS */}
-          <div style={{ marginTop: "15px" }}>
+          <div style={{ marginTop: 15 }}>
             <button
               onClick={() => updateStatus(selected._id, "approved")}
               disabled={selected.status === "approved"}
@@ -127,17 +106,14 @@ export default function AllRequests() {
             <button
               onClick={() => updateStatus(selected._id, "rejected")}
               disabled={selected.status === "rejected"}
-              style={{ marginLeft: "10px" }}
+              style={{ marginLeft: 10 }}
             >
               ❌ Reject
             </button>
           </div>
 
-          {/* CLOSE BUTTON */}
-          <div style={{ marginTop: "15px" }}>
-            <button onClick={() => setSelected(null)}>
-              Close
-            </button>
+          <div style={{ marginTop: 15 }}>
+            <button onClick={() => setSelected(null)}>Close</button>
           </div>
         </div>
       )}

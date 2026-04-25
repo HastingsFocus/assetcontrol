@@ -4,7 +4,9 @@ import API from "../services/api";
 export default function AllRequests() {
   const [requests, setRequests] = useState([]);
   const [selected, setSelected] = useState(null);
+  const [approvedQty, setApprovedQty] = useState("");
 
+  // 📦 Fetch requests
   const fetchRequests = async () => {
     try {
       const res = await API.get("/requests");
@@ -18,13 +20,40 @@ export default function AllRequests() {
     fetchRequests();
   }, []);
 
+  // ✅ Approve / Reject status
   const updateStatus = async (id, status) => {
     try {
       const res = await API.put(`/requests/${id}`, { status });
+
       setSelected(res.data.request);
       fetchRequests();
     } catch (err) {
-      console.log("❌ Update error:", err);
+      console.log("❌ Update error:", err.response?.data || err);
+    }
+  };
+
+  // ✅ Save approved quantity (AFTER approval)
+  const updateApprovedQuantity = async () => {
+    try {
+      if (!approvedQty || approvedQty <= 0) {
+        alert("Enter a valid quantity");
+        return;
+      }
+
+      if (approvedQty > selected.quantity) {
+        alert("Cannot exceed requested quantity");
+        return;
+      }
+
+      const res = await API.put(`/requests/${selected._id}`, {
+        approvedQuantity: approvedQty,
+      });
+
+      setSelected(res.data.request);
+      setApprovedQty("");
+      fetchRequests();
+    } catch (err) {
+      console.log("❌ Quantity update error:", err.response?.data || err);
     }
   };
 
@@ -32,6 +61,7 @@ export default function AllRequests() {
     <div>
       <h2>📦 All Requests</h2>
 
+      {/* TABLE */}
       <table border="1" cellPadding="10" style={{ width: "100%", marginTop: "20px" }}>
         <thead>
           <tr>
@@ -53,13 +83,21 @@ export default function AllRequests() {
               <td>{req.priority}</td>
               <td>{req.status}</td>
               <td>
-                <button onClick={() => setSelected(req)}>View</button>
+                <button
+                  onClick={() => {
+                    setSelected(req);
+                    setApprovedQty("");
+                  }}
+                >
+                  View
+                </button>
               </td>
             </tr>
           ))}
         </tbody>
       </table>
 
+      {/* DETAILS PANEL */}
       {selected && (
         <div style={{ marginTop: 20, padding: 20, border: "1px solid #ccc" }}>
           <h3>Request Details</h3>
@@ -68,9 +106,10 @@ export default function AllRequests() {
           <p><strong>Department:</strong> {selected.user?.department}</p>
           <p><strong>Requested By:</strong> {selected.user?.name}</p>
           <p><strong>Email:</strong> {selected.user?.email}</p>
-          <p><strong>Quantity:</strong> {selected.quantity}</p>
-          <p><strong>Priority:</strong> {selected.priority}</p>
 
+          <p><strong>Requested Quantity:</strong> {selected.quantity}</p>
+
+          {/* STATUS */}
           <p>
             <strong>Status:</strong>{" "}
             <span
@@ -95,6 +134,7 @@ export default function AllRequests() {
               : "N/A"}
           </p>
 
+          {/* ACTION BUTTONS */}
           <div style={{ marginTop: 15 }}>
             <button
               onClick={() => updateStatus(selected._id, "approved")}
@@ -112,6 +152,39 @@ export default function AllRequests() {
             </button>
           </div>
 
+          {/* APPROVED QUANTITY SECTION (AFTER APPROVAL ONLY) */}
+          {selected.status === "approved" && (
+            <div style={{ marginTop: 15 }}>
+              {/* If already saved */}
+              {selected.approvedQuantity ? (
+                <p>
+                  <strong>Approved Quantity:</strong>{" "}
+                  {selected.approvedQuantity}
+                </p>
+              ) : (
+                // If not yet saved
+                <div>
+                  <label><strong>Enter Approved Quantity:</strong></label>
+                  <br />
+
+                  <input
+                    type="number"
+                    value={approvedQty}
+                    onChange={(e) => setApprovedQty(Number(e.target.value))}
+                  />
+
+                  <button
+                    onClick={updateApprovedQuantity}
+                    style={{ marginLeft: 10 }}
+                  >
+                    💾 Save Quantity
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* CLOSE */}
           <div style={{ marginTop: 15 }}>
             <button onClick={() => setSelected(null)}>Close</button>
           </div>

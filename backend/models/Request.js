@@ -37,6 +37,10 @@ const requestSchema = new mongoose.Schema(
       required: true,
     },
 
+    approvedQuantity: {
+      type: Number,
+    },
+
     status: {
       type: String,
       enum: ["pending", "approved", "rejected"],

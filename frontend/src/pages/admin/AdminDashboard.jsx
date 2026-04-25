@@ -1,27 +1,42 @@
 import { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import AllRequests from "../../components/AllRequests";
 import InventoryOverview from "../../components/InventoryOverview";
 import socket from "../../socket";
+import API from "../../services/api";
 
 export default function AdminDashboard() {
-  const user = JSON.parse(localStorage.getItem("user") || "{}");
-  const navigate = useNavigate();
-
+  const [user, setUser] = useState(null);
   const [active, setActive] = useState("assets");
   const [notifications, setNotifications] = useState([]);
 
-  // 🔥 LOGOUT FUNCTION (REUSABLE LOGIC)
-  const handleLogout = () => {
-    localStorage.removeItem("token");
-    localStorage.removeItem("user");
+  const navigate = useNavigate();
+  const location = useLocation();
 
-    socket.disconnect(); // 🔥 VERY IMPORTANT (prevents weird reconnect issues)
+  // =========================
+  // 🔐 LOAD REAL USER (SAFE)
+  // =========================
+  useEffect(() => {
+    const loadUser = async () => {
+      try {
+        const res = await API.get("/auth/me");
+        setUser(res.data.user);
+      } catch (err) {
+        console.log("Session expired");
 
-    navigate("/login");
-  };
+        localStorage.removeItem("token");
+        localStorage.removeItem("user");
 
-  // 🔥 SOCKET CONNECTION
+        navigate("/login");
+      }
+    };
+
+    loadUser();
+  }, [navigate]);
+
+  // =========================
+  // 🔥 SOCKET CONNECTION (SAFE)
+  // =========================
   useEffect(() => {
     if (!user?._id) return;
 
@@ -29,7 +44,6 @@ export default function AdminDashboard() {
 
     const handleNotification = (data) => {
       setNotifications((prev) => [data, ...prev]);
-      alert(`🔔 ${data.message}`);
     };
 
     socket.on("notification", handleNotification);
@@ -39,7 +53,21 @@ export default function AdminDashboard() {
     };
   }, [user]);
 
-  // 🔥 VIEW REQUEST FROM NOTIFICATION
+  // =========================
+  // 🚪 LOGOUT
+  // =========================
+  const handleLogout = () => {
+    localStorage.removeItem("token");
+    localStorage.removeItem("user");
+
+    socket.disconnect();
+
+    navigate("/login");
+  };
+
+  // =========================
+  // 🔔 VIEW REQUEST FROM NOTIFICATION
+  // =========================
   const handleViewRequest = (requestId) => {
     if (!requestId) return;
 
@@ -47,6 +75,18 @@ export default function AdminDashboard() {
     navigate(`/admin?requestId=${requestId}`);
   };
 
+  // =========================
+  // 🔄 LOADING STATE
+  // =========================
+  if (!user) {
+    return <p style={{ padding: 20 }}>Loading admin dashboard...</p>;
+  }
+
+  const highlightId = new URLSearchParams(location.search).get("requestId");
+
+  // =========================
+  // UI
+  // =========================
   return (
     <div style={{ display: "flex", height: "100vh" }}>
 
@@ -59,23 +99,27 @@ export default function AdminDashboard() {
           padding: "20px",
           display: "flex",
           flexDirection: "column",
-          justifyContent: "space-between", // 🔥 PUSHES LOGOUT TO BOTTOM
+          justifyContent: "space-between",
         }}
       >
-        {/* TOP SECTION */}
+
+        {/* TOP */}
         <div>
-          <h3>👤 {user?.name} (Admin)</h3>
+          <h3 style={{ marginBottom: "5px" }}>
+  👤 {user?.name || "Admin"}
+</h3>
+
+<p style={{ fontSize: "12px", opacity: 0.7 }}>
+  {user?.email}
+</p>
+
+<p style={{ fontSize: "12px", color: "#9ca3af" }}>
+  {user?.role?.toUpperCase()}
+</p>
 
           <hr />
 
-          <div
-            style={{
-              marginTop: "20px",
-              display: "flex",
-              flexDirection: "column",
-              gap: "15px",
-            }}
-          >
+          <div style={{ marginTop: "20px", display: "flex", flexDirection: "column", gap: "15px" }}>
             <button onClick={() => setActive("assets")}>
               📊 Inventory Overview
             </button>
@@ -89,25 +133,12 @@ export default function AdminDashboard() {
             </button>
 
             <button onClick={() => setActive("notifications")}>
-              🔔 Notifications
-              {notifications.length > 0 && (
-                <span
-                  style={{
-                    marginLeft: "10px",
-                    background: "red",
-                    padding: "2px 8px",
-                    borderRadius: "20px",
-                    fontSize: "12px",
-                  }}
-                >
-                  {notifications.length}
-                </span>
-              )}
+              🔔 Notifications ({notifications.length})
             </button>
           </div>
         </div>
 
-        {/* 🔴 LOGOUT BUTTON (BOTTOM) */}
+        {/* LOGOUT */}
         <button
           onClick={handleLogout}
           style={{
@@ -116,7 +147,6 @@ export default function AdminDashboard() {
             border: "none",
             padding: "10px",
             borderRadius: "6px",
-            cursor: "pointer",
           }}
         >
           🚪 Logout
@@ -129,11 +159,7 @@ export default function AdminDashboard() {
         {active === "assets" && <InventoryOverview />}
 
         {active === "requests" && (
-          <AllRequests
-            highlightId={
-              new URLSearchParams(window.location.search).get("requestId")
-            }
-          />
+          <AllRequests highlightId={highlightId} />
         )}
 
         {active === "reports" && (
@@ -171,10 +197,9 @@ export default function AdminDashboard() {
                         border: "none",
                         padding: "5px 10px",
                         borderRadius: "5px",
-                        cursor: "pointer",
                       }}
                     >
-                      View More
+                      View
                     </button>
                   )}
                 </div>

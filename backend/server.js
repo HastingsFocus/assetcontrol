@@ -8,6 +8,7 @@ import requestRoutes from "./routes/requestRoutes.js";
 import notificationRoutes from "./routes/notificationRoutes.js";
 import itemRoutes from "./routes/itemRoutes.js";
 import { initSocket } from "./socket.js";
+import settingsRoutes from "./routes/settingsRoutes.js";
 
 dotenv.config();
 connectDB();
@@ -28,6 +29,7 @@ app.use("/api/auth", authRoutes);
 app.use("/api/requests", requestRoutes);
 app.use("/api/notifications", notificationRoutes);
 app.use("/api/items", itemRoutes);
+app.use("/api/settings", settingsRoutes);
 
 app.get("/", (req, res) => {
   res.send("API Running...");

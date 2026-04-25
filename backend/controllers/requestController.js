@@ -138,16 +138,17 @@ export const getAllRequests = async (req, res) => {
 // ===============================
 export const updateRequestStatus = async (req, res) => {
   try {
-    const { status } = req.body;
+    const { status, approvedQuantity } = req.body;
 
     const validStatuses = ["pending", "approved", "rejected"];
 
-    if (!validStatuses.includes(status)) {
+    if (!validStatuses.includes(status) && status !== undefined) {
       return res.status(400).json({
         message: "Invalid status",
       });
     }
 
+    // 🔍 Get request
     const request = await Request.findById(req.params.id)
       .populate("itemType", "name");
 
@@ -157,40 +158,96 @@ export const updateRequestStatus = async (req, res) => {
       });
     }
 
-    if (request.status === status) {
-      return res.status(400).json({
-        message: `Request is already ${status}`,
+    console.log("🔄 Updating request...");
+
+    const updateData = {};
+
+    // ================================
+    // 1️⃣ STATUS UPDATE (Approve/Reject)
+    // ================================
+    if (status) {
+      if (request.status === status) {
+        return res.status(400).json({
+          message: `Request is already ${status}`,
+        });
+      }
+
+      updateData.status = status;
+    }
+
+    // ================================
+    // 2️⃣ APPROVED QUANTITY UPDATE
+    // ================================
+    if (approvedQuantity !== undefined) {
+      if (approvedQuantity <= 0) {
+        return res.status(400).json({
+          message: "Approved quantity must be greater than 0",
+        });
+      }
+
+      if (approvedQuantity > request.quantity) {
+        return res.status(400).json({
+          message: "Approved quantity cannot exceed requested quantity",
+        });
+      }
+
+      updateData.approvedQuantity = approvedQuantity;
+    }
+
+    // ================================
+    // 3️⃣ UPDATE DB
+    // ================================
+    const updatedRequest = await Request.findByIdAndUpdate(
+      req.params.id,
+      updateData,
+      { new: true }
+    ).populate("itemType", "name");
+
+    const itemName =
+      updatedRequest.itemType?.name || updatedRequest.itemName;
+
+    // ================================
+    // 4️⃣ NOTIFICATIONS (SMART)
+    // ================================
+    let message = "";
+
+    if (status === "approved") {
+      message = `Your request for ${itemName} was approved`;
+
+      if (updatedRequest.approvedQuantity) {
+        message += ` (Qty: ${updatedRequest.approvedQuantity})`;
+      }
+    }
+
+    if (status === "rejected") {
+      message = `Your request for ${itemName} was rejected`;
+    }
+
+    if (approvedQuantity !== undefined && !status) {
+      message = `Approved quantity updated for ${itemName} (Qty: ${approvedQuantity})`;
+    }
+
+    if (message) {
+      await Notification.create({
+        user: updatedRequest.user,
+        message,
+        type: "status_updated",
+        request: updatedRequest._id,
+      });
+
+      sendNotification(updatedRequest.user, {
+        message,
+        type: "status_updated",
+        request: updatedRequest._id,
       });
     }
 
-    console.log("🔄 Updating request status...");
-
-    request.status = status;
-    await request.save();
-
-    const message =
-      status === "approved"
-        ? `Your request for ${request.itemType.name} was approved`
-        : `Your request for ${request.itemType.name} was rejected`;
-
-    console.log("📢 Notifying user:", request.user);
-
-    await Notification.create({
-      user: request.user,
-      message,
-      type: "status_updated",
-      request: request._id,
-    });
-
-    sendNotification(request.user, {
-      message,
-      type: "status_updated",
-      request: request._id,
-    });
-
+    // ================================
+    // 5️⃣ RESPONSE
+    // ================================
     res.json({
       message: "Request updated successfully",
-      request,
+      request: updatedRequest,
     });
 
   } catch (error) {

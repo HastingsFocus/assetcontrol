@@ -1,44 +1,83 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
+import API from "../services/api";
 import RequisitionForm from "../components/RequisitionForm";
 import MyRequests from "../components/MyRequests";
 import socket from "../socket";
 
 export default function Dashboard() {
-  const user = JSON.parse(localStorage.getItem("user") || "{}");
+  const [user, setUser] = useState(null);
   const navigate = useNavigate();
 
   const [active, setActive] = useState("requisition");
   const [notifications, setNotifications] = useState([]);
 
-  // 🔥 LOGOUT FUNCTION (same as admin)
+  // =========================
+  // 🔐 LOAD USER FROM BACKEND
+  // =========================
+  useEffect(() => {
+    const load = async () => {
+      try {
+        const res = await API.get("/auth/me");
+        setUser(res.data.user);
+      } catch (err) {
+        console.log("Session expired");
+
+        localStorage.removeItem("token");
+        localStorage.removeItem("user");
+
+        navigate("/login");
+      }
+    };
+
+    load();
+  }, []);
+
+
+  
+
+  // =========================
+  // 🔥 SOCKET SETUP
+  // =========================
+  useEffect(() => {
+    if (!user?._id) return;
+
+    socket.emit("register", user._id);
+
+    const handleNotification = (data) => {
+      console.log("New notification:", data);
+      setNotifications((prev) => [data, ...prev]);
+    };
+
+    socket.on("notification", handleNotification);
+
+    return () => {
+      socket.off("notification", handleNotification);
+    };
+  }, [user]);
+
+  // =========================
+  // 🚪 LOGOUT
+  // =========================
   const handleLogout = () => {
     localStorage.removeItem("token");
     localStorage.removeItem("user");
 
-    socket.disconnect(); // 🔥 prevent multiple connections
+    socket.disconnect();
 
     navigate("/login");
   };
 
-  // 🔥 SOCKET SETUP
-  useEffect(() => {
-    if (user?._id) {
-      socket.emit("register", user._id);
+  // =========================
+  // ⏳ LOADING STATE
+  // =========================
+  if (!user) {
+    return <p style={{ padding: 20 }}>Loading dashboard...</p>;
+  }
 
-      const handleNotification = (data) => {
-        console.log("New notification:", data);
-        setNotifications((prev) => [data, ...prev]);
-      };
-
-      socket.on("notification", handleNotification);
-
-      return () => {
-        socket.off("notification", handleNotification);
-      };
-    }
-  }, [user]);
-
+  // =========================
+  // UI
+  // =========================
   return (
     <div style={{ display: "flex", height: "100vh" }}>
 
@@ -51,59 +90,46 @@ export default function Dashboard() {
           padding: "20px",
           display: "flex",
           flexDirection: "column",
-          justifyContent: "space-between", // 🔥 push logout down
+          justifyContent: "space-between",
         }}
       >
 
         {/* TOP */}
         <div>
-          <h3 style={{ marginBottom: "20px" }}>
-            👤 {user?.name}
-          </h3>
+         <h3 style={{ marginBottom: "5px" }}>
+  👤 {user?.name || "Loading..."}
+</h3>
+
+<p style={{ fontSize: "12px", opacity: 0.7 }}>
+  {user?.email}
+</p>
 
           <hr />
 
-          <div
-            style={{
-              marginTop: "20px",
-              display: "flex",
-              flexDirection: "column",
-              gap: "15px",
-            }}
-          >
-            <div
-  style={{
-    marginTop: "20px",
-    display: "flex",
-    flexDirection: "column",
-    gap: "15px",
-  }}
->
-  <button onClick={() => setActive("requisition")}>
-    📦 Place Requisition
-  </button>
+          <div style={{ marginTop: "20px", display: "flex", flexDirection: "column", gap: "15px" }}>
+            <button onClick={() => setActive("requisition")}>
+              📦 Place Requisition
+            </button>
 
-  <button onClick={() => setActive("myRequests")}>
-    📋 My Requests
-  </button>
+            <button onClick={() => setActive("myRequests")}>
+              📋 My Requests
+            </button>
 
-  <button onClick={() => setActive("condition")}>
-    🧾 Provide Asset Condition
-  </button>
+            <button onClick={() => setActive("condition")}>
+              🧾 Provide Asset Condition
+            </button>
 
-  <button onClick={() => setActive("notifications")}>
-    🔔 Notifications ({notifications.length})
-  </button>
+            <button onClick={() => setActive("notifications")}>
+              🔔 Notifications ({notifications.length})
+            </button>
 
-  {/* 🔥 NEW BUTTON */}
-  <button onClick={() => navigate("/edit-inventory")}>
-    ✏️ Edit Inventory
-  </button>
-</div>
+            <button onClick={() => navigate("/edit-inventory")}>
+              ✏️ Edit Inventory
+            </button>
           </div>
         </div>
 
-        {/* 🔴 LOGOUT BUTTON (BOTTOM) */}
+        {/* LOGOUT */}
         <button
           onClick={handleLogout}
           style={{

@@ -4,7 +4,7 @@ const API = axios.create({
   baseURL: "http://localhost:5000/api",
 });
 
-// 🔥 Attach token
+// 🔐 ALWAYS attach token
 API.interceptors.request.use((req) => {
   const token = localStorage.getItem("token");
 

@@ -1,88 +1,109 @@
 import { useState } from "react";
-import API from "../services/api";
 import { useNavigate, Link } from "react-router-dom";
+import API from "../services/api";
+import { useAuth } from "../context/AuthContext";
+import { toast } from "react-toastify";
 
 export default function Login() {
+  const navigate = useNavigate();
+  const { login } = useAuth();
+
   const [form, setForm] = useState({
     email: "",
     password: "",
   });
 
-  const navigate = useNavigate();
+  const [loading, setLoading] = useState(false);
 
+  // 🔄 Handle input
   const handleChange = (e) => {
-    setForm({ ...form, [e.target.name]: e.target.value });
+    setForm({
+      ...form,
+      [e.target.name]: e.target.value,
+    });
   };
 
-  // 🔥 REDIRECT LOGIC
-  const checkSetupAndRedirect = async (user) => {
+  // 🚀 Submit (NOW INSIDE COMPONENT)
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+
     try {
-      // 🟢 ADMIN FLOW
+      setLoading(true);
+
+      // 🔐 LOGIN
+      const res = await API.post("/auth/login", form);
+
+      login(res.data);
+
+      const user = res.data.user;
+      console.log(user._id);
+
+      toast.success("Login successful 🚀");
+
+      // ✅ ADMIN FIRST (STOP HERE)
       if (user.role === "admin") {
         navigate("/admin");
         return;
       }
 
-      // 🔥 IMPORTANT: user-specific check
-      const res = await API.get("/items/check-setup");
+      // 🔥 ONLY NORMAL USERS REACH HERE
+      const check = await API.get("/items/check-my-setup");
 
-      if (res.data.isSetup) {
-        navigate("/dashboard");
-      } else {
+      if (!check.data.isSetup) {
         navigate("/setup-inventory");
+        return;
       }
 
-    } catch (err) {
-      console.error("Setup check failed:", err);
-      navigate("/dashboard"); // safety fallback
-    }
-  };
-
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-
-    try {
-      const res = await API.post("/auth/login", form);
-
-      // 🔐 SAVE AUTH DATA
-      localStorage.setItem("token", res.data.token);
-      localStorage.setItem("user", JSON.stringify(res.data.user));
-
-      alert("Login successful");
-
-      // 🚀 ROUTE USER PROPERLY
-      await checkSetupAndRedirect(res.data.user);
+      navigate("/dashboard");
 
     } catch (error) {
-      alert(error.response?.data?.message || "Login failed");
+      const message =
+        error.response?.data?.message || "Login failed";
+
+      toast.error(message);
+      console.log("❌ LOGIN ERROR:", message);
+
+    } finally {
+      setLoading(false);
     }
   };
 
   return (
-    <div>
+    <div style={{ maxWidth: "400px", margin: "auto" }}>
       <h2>Login</h2>
 
       <form onSubmit={handleSubmit}>
         <input
+          type="email"
           name="email"
           placeholder="Email"
+          value={form.email}
           onChange={handleChange}
+          required
         />
+
+        <br /><br />
 
         <input
-          name="password"
           type="password"
+          name="password"
           placeholder="Password"
+          value={form.password}
           onChange={handleChange}
+          required
         />
 
-        <button type="submit">Login</button>
+        <br /><br />
+
+        <button type="submit" disabled={loading}>
+          {loading ? "Logging in..." : "Login"}
+        </button>
       </form>
 
-      <p style={{ marginTop: "10px" }}>
+      <p style={{ marginTop: "15px" }}>
         Don’t have an account?{" "}
         <Link to="/register" style={{ color: "blue" }}>
-          Register
+          Sign up
         </Link>
       </p>
     </div>

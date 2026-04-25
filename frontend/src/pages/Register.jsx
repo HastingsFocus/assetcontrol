@@ -1,8 +1,13 @@
 import { useState } from "react";
 import API from "../services/api";
 import { useNavigate, Link } from "react-router-dom";
+import { useAuth } from "../context/AuthContext";
+import { toast } from "react-toastify";
 
 export default function Register() {
+  const navigate = useNavigate();
+  const { login } = useAuth(); // ✅ MUST be inside component
+
   const [form, setForm] = useState({
     name: "",
     email: "",
@@ -12,52 +17,42 @@ export default function Register() {
 
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
 
-  const navigate = useNavigate();
+  // 🔐 Password validation
+  const validatePassword = (password) => ({
+    minLength: password.length >= 6,
+    hasUpper: /[A-Z]/.test(password),
+    hasLower: /[a-z]/.test(password),
+    hasNumber: /[0-9]/.test(password),
+    hasSymbol: /[!@#$%^&*(),.?":{}|<>]/.test(password),
+  });
 
-  // 🔐 Password validation rules
-  const validatePassword = (password) => {
-    return {
-      minLength: password.length >= 6,
-      hasUpper: /[A-Z]/.test(password),
-      hasLower: /[a-z]/.test(password),
-      hasNumber: /[0-9]/.test(password),
-      hasSymbol: /[!@#$%^&*(),.?":{}|<>]/.test(password),
-    };
-  };
-
-  // 📊 Strength calculator
+  // 📊 Strength
   const getStrength = (password) => {
     const rules = validatePassword(password);
-    let score = 0;
-
-    Object.values(rules).forEach((val) => {
-      if (val) score++;
-    });
-
-    return score; // 0 - 5
+    return Object.values(rules).filter(Boolean).length;
   };
 
   const strength = getStrength(form.password);
 
-  // 🔁 Handle input change
+  // 🔁 Handle input
   const handleChange = (e) => {
     setForm({ ...form, [e.target.name]: e.target.value });
     setError("");
   };
 
-  // 👁️ toggle password visibility
+  // 👁️ Toggle password
   const togglePassword = () => {
-    setShowPassword(!showPassword);
+    setShowPassword((prev) => !prev);
   };
 
-  // 🚀 submit form
+  // 🚀 Submit
   const handleSubmit = async (e) => {
     e.preventDefault();
 
     const rules = validatePassword(form.password);
 
-    // ❌ weak password check
     if (
       !rules.minLength ||
       !rules.hasUpper ||
@@ -71,23 +66,44 @@ export default function Register() {
       return;
     }
 
-    // ❌ confirm password check
     if (form.password !== form.confirmPassword) {
       setError("Passwords do not match");
       return;
     }
 
     try {
-      await API.post("/auth/register", {
+      setLoading(true);
+
+      const res = await API.post("/auth/register", {
         name: form.name,
         email: form.email,
         password: form.password,
       });
 
-      alert("Registration successful");
-      navigate("/login");
-    } catch (error) {
-      setError(error.response?.data?.message || "Registration failed");
+      // 🔥 Auto-login if backend returns token
+      if (res.data.token && res.data.user) {
+        login(res.data);
+        toast.success("Account created successfully 🚀");
+
+        if (res.data.user.role === "admin") {
+          navigate("/admin");
+        } else {
+          navigate("/dashboard");
+        }
+      } else {
+        toast.success("Registration successful! Please login.");
+        navigate("/login");
+      }
+
+    } catch (err) {
+      const message =
+        err.response?.data?.message || "Registration failed";
+
+      setError(message);
+      toast.error(message);
+
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -100,14 +116,19 @@ export default function Register() {
         <input
           name="name"
           placeholder="Name"
+          value={form.name}
           onChange={handleChange}
+          required
         />
 
         {/* EMAIL */}
         <input
           name="email"
+          type="email"
           placeholder="Email"
+          value={form.email}
           onChange={handleChange}
+          required
         />
 
         {/* PASSWORD */}
@@ -116,7 +137,9 @@ export default function Register() {
             name="password"
             type={showPassword ? "text" : "password"}
             placeholder="Password"
+            value={form.password}
             onChange={handleChange}
+            required
           />
 
           <button type="button" onClick={togglePassword}>
@@ -129,22 +152,32 @@ export default function Register() {
           name="confirmPassword"
           type={showPassword ? "text" : "password"}
           placeholder="Confirm Password"
+          value={form.confirmPassword}
           onChange={handleChange}
+          required
         />
 
-        {/* PASSWORD STRENGTH BAR */}
+        {/* PASSWORD STRENGTH */}
         <div style={{ marginTop: "10px" }}>
           <div>Password Strength:</div>
           <div style={{ display: "flex", gap: "5px" }}>
-            <div style={{ width: 40, height: 5, background: strength > 0 ? "red" : "#ccc" }} />
-            <div style={{ width: 40, height: 5, background: strength > 1 ? "orange" : "#ccc" }} />
-            <div style={{ width: 40, height: 5, background: strength > 2 ? "yellow" : "#ccc" }} />
-            <div style={{ width: 40, height: 5, background: strength > 3 ? "lightgreen" : "#ccc" }} />
-            <div style={{ width: 40, height: 5, background: strength > 4 ? "green" : "#ccc" }} />
+            {[0, 1, 2, 3, 4].map((i) => (
+              <div
+                key={i}
+                style={{
+                  width: 40,
+                  height: 5,
+                  background:
+                    strength > i
+                      ? ["red", "orange", "yellow", "lightgreen", "green"][i]
+                      : "#ccc",
+                }}
+              />
+            ))}
           </div>
         </div>
 
-        {/* ERROR MESSAGE */}
+        {/* ERROR */}
         {error && (
           <p style={{ color: "red", marginTop: "10px" }}>
             {error}
@@ -152,8 +185,12 @@ export default function Register() {
         )}
 
         {/* SUBMIT */}
-        <button type="submit" style={{ marginTop: "10px" }}>
-          Register
+        <button
+          type="submit"
+          disabled={loading}
+          style={{ marginTop: "10px" }}
+        >
+          {loading ? "Creating account..." : "Register"}
         </button>
       </form>
 

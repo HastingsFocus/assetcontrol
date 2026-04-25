@@ -1,8 +1,13 @@
 import { useEffect, useState } from "react";
 import API from "../services/api";
 import { useNavigate } from "react-router-dom";
+import { useAuth } from "../context/AuthContext";
+import { toast } from "react-toastify";
 
 export default function SetupInventory() {
+  const { user } = useAuth(); // 🔥 use context
+  const navigate = useNavigate();
+
   const [itemTypes, setItemTypes] = useState([]);
   const [items, setItems] = useState([
     {
@@ -13,9 +18,7 @@ export default function SetupInventory() {
   ]);
 
   const [loading, setLoading] = useState(true);
-
-  const navigate = useNavigate();
-  const user = JSON.parse(localStorage.getItem("user"));
+  const [saving, setSaving] = useState(false);
 
   // =========================
   // 🔥 LOAD DATA
@@ -33,7 +36,8 @@ export default function SetupInventory() {
       const res = await API.get("/items/types");
       setItemTypes(res.data);
     } catch (err) {
-      console.error("❌ Failed to fetch item types", err);
+      console.error(err);
+      toast.error("Failed to fetch item types");
     }
   };
 
@@ -46,7 +50,7 @@ export default function SetupInventory() {
 
       if (res.data.length > 0) {
         const formatted = res.data.map((item) => ({
-          _id: item._id, // 🔥 IMPORTANT
+          _id: item._id,
           itemType: item.itemType._id,
           conditions: {
             good: item.conditions?.good || 0,
@@ -58,14 +62,15 @@ export default function SetupInventory() {
         setItems(formatted);
       }
     } catch (error) {
-      console.error("❌ Failed to load inventory", error);
+      console.error(error);
+      toast.error("Failed to load inventory");
     } finally {
       setLoading(false);
     }
   };
 
   // =========================
-  // ➕ ADD ITEM ROW
+  // ➕ ADD ITEM
   // =========================
   const addItem = () => {
     setItems([
@@ -97,7 +102,7 @@ export default function SetupInventory() {
   };
 
   // =========================
-  // 🔢 TOTAL CALCULATION
+  // 🔢 TOTAL
   // =========================
   const getTotal = (conditions) => {
     return (
@@ -108,11 +113,13 @@ export default function SetupInventory() {
   };
 
   // =========================
-  // 🚫 VALIDATIONS
+  // 🚫 VALIDATION
   // =========================
   const selectedIds = items.map((i) => i.itemType);
+
   const hasDuplicate =
-    new Set(selectedIds).size !== selectedIds.length;
+    new Set(selectedIds.filter(Boolean)).size !==
+    selectedIds.filter(Boolean).length;
 
   const hasInvalid = items.some((item) => {
     if (!item.itemType) return true;
@@ -120,68 +127,82 @@ export default function SetupInventory() {
   });
 
   // =========================
-  // 🔥 SUBMIT (FIXED)
+  // 🚀 SUBMIT
   // =========================
   const submit = async () => {
     if (hasDuplicate) {
-      alert("Duplicate items not allowed");
+      toast.error("Duplicate items not allowed");
       return;
     }
 
     if (hasInvalid) {
-      alert("Each item must have at least 1 quantity");
+      toast.error("Each item must have at least 1 quantity");
       return;
     }
 
     try {
+      setSaving(true);
+
+      const newItems = items.filter((i) => !i._id);
+      const existingItems = items.filter((i) => i._id);
+
+      // 🔄 UPDATE EXISTING
       await Promise.all(
-        items.map((item) => {
-          if (item._id) {
-            // 🔥 UPDATE EXISTING ITEM
-            return API.put(`/items/my-item/${item._id}`, {
-              itemType: item.itemType,
-              conditions: item.conditions,
-            });
-          } else {
-            // 🔥 CREATE NEW ITEM
-            return API.post("/items/setup", {
-              items: [
-                {
-                  itemType: item.itemType,
-                  conditions: item.conditions,
-                },
-              ],
-            });
-          }
-        })
+        existingItems.map((item) =>
+          API.put(`/items/my-item/${item._id}`, {
+            itemType: item.itemType,
+            conditions: item.conditions,
+          })
+        )
       );
 
-      alert("Inventory saved successfully");
+      // ➕ CREATE NEW (BATCH)
+      if (newItems.length > 0) {
+        await API.post("/items/setup", {
+          items: newItems.map((item) => ({
+            itemType: item.itemType,
+            conditions: item.conditions,
+          })),
+        });
+      }
 
-      const updatedUser = JSON.parse(localStorage.getItem("user"));
-      updatedUser.inventorySetupComplete = true;
-      localStorage.setItem("user", JSON.stringify(updatedUser));
+      // ✅ MARK SETUP COMPLETE
+      await API.put("/settings/setup-complete");
 
-      navigate("/dashboard");
+      toast.success("Inventory setup completed successfully 🚀");
+
+      // 🚀 REDIRECT
+      if (user?.role === "admin") {
+        navigate("/admin");
+      } else {
+        navigate("/dashboard");
+      }
+
     } catch (error) {
       console.log(error);
-      alert(error.response?.data?.message || "Failed to save inventory");
+      toast.error(
+        error.response?.data?.message || "Failed to save inventory"
+      );
+    } finally {
+      setSaving(false);
     }
   };
 
   // =========================
-  // 🔄 LOADING
+  // ⏳ LOADING UI
   // =========================
   if (loading) {
-    return <p style={{ padding: 20 }}>Loading inventory...</p>;
+    return <p style={{ textAlign: "center" }}>Loading inventory...</p>;
   }
 
   // =========================
-  // UI
+  // 🎨 UI
   // =========================
   return (
     <div style={{ padding: 20 }}>
-      <h2>Inventory Setup - {user?.department}</h2>
+      <h2>
+        Inventory Setup - {user?.department || "Department"}
+      </h2>
 
       {items.map((item, index) => (
         <div
@@ -196,11 +217,20 @@ export default function SetupInventory() {
           {/* ITEM TYPE */}
           <select
             value={item.itemType}
-            onChange={(e) => updateItemType(index, e.target.value)}
+            onChange={(e) =>
+              updateItemType(index, e.target.value)
+            }
           >
             <option value="">Select Item</option>
             {itemTypes.map((t) => (
-              <option key={t._id} value={t._id}>
+              <option
+                key={t._id}
+                value={t._id}
+                disabled={items.some(
+                  (i, idx) =>
+                    i.itemType === t._id && idx !== index
+                )}
+              >
                 {t.name}
               </option>
             ))}
@@ -249,12 +279,17 @@ export default function SetupInventory() {
 
       <br /><br />
 
-      <button onClick={submit} disabled={hasDuplicate || hasInvalid}>
-        💾 Save Inventory
+      <button
+        onClick={submit}
+        disabled={hasDuplicate || hasInvalid || saving}
+      >
+        {saving ? "Saving..." : "💾 Save Inventory"}
       </button>
 
       {hasDuplicate && (
-        <p style={{ color: "red" }}>Duplicate items not allowed</p>
+        <p style={{ color: "red" }}>
+          Duplicate items not allowed
+        </p>
       )}
 
       {hasInvalid && (

@@ -1,6 +1,11 @@
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { useEffect } from "react";
+import API from "./services/api";
 import socket from "./services/socket";
+import { useAuth } from "./context/AuthContext";
+
+// 🔐 Guards
+import ProtectedDashboard from "./guards/ProtectedDashboards";
 
 // Toast
 import { ToastContainer, toast } from "react-toastify";
@@ -11,29 +16,50 @@ import Login from "./pages/Login";
 import Register from "./pages/Register";
 import Dashboard from "./pages/Dashboard";
 import AdminDashboard from "./pages/admin/AdminDashboard";
-import SetUpInventory from "./pages/SetUpInventory.jsx"; // 🔥 ADDED
+import SetUpInventory from "./pages/SetUpInventory.jsx";
 import EditInventory from "./pages/EditInventory";
 
 function App() {
+  const { user, token, login, logout } = useAuth();
 
-  // 🔥 CONNECT USER TO SOCKET
+  // =========================
+  // 🔐 SESSION RESTORE
+  // =========================
   useEffect(() => {
-    const user = JSON.parse(localStorage.getItem("user"));
+    const loadUser = async () => {
+      if (!token) return;
 
-    if (user?._id) {
-      socket.emit("register", user._id);
-      console.log("✅ Socket registered:", user._id);
-    }
+      try {
+        const res = await API.get("/auth/me");
+        const userData = res.data.user;
 
-    // 🔔 LISTEN FOR NOTIFICATIONS
-    socket.on("notification", (data) => {
-      console.log("🔔 Notification:", data);
+        login({ user: userData, token });
 
+        if (userData?._id) {
+          socket.emit("register", userData._id);
+        }
+
+      } catch (err) {
+        console.log("❌ Session expired");
+        logout();
+      }
+    };
+
+    loadUser();
+  }, [token]);
+
+  // =========================
+  // 🔔 SOCKET LISTENER
+  // =========================
+  useEffect(() => {
+    const handleNotification = (data) => {
       toast.info(data.message);
-    });
+    };
+
+    socket.on("notification", handleNotification);
 
     return () => {
-      socket.off("notification");
+      socket.off("notification", handleNotification);
     };
   }, []);
 
@@ -41,26 +67,66 @@ function App() {
     <>
       <BrowserRouter>
         <Routes>
-          {/* 🔥 DEFAULT ROUTE */}
-          <Route path="/" element={<Navigate to="/login" />} />
 
-          {/* AUTH */}
+          {/* =========================
+              🔥 PUBLIC ROUTES
+              ========================= */}
+          <Route path="/" element={<Navigate to="/login" />} />
           <Route path="/login" element={<Login />} />
           <Route path="/register" element={<Register />} />
 
-          {/* 🔥 INVENTORY SETUP ROUTE */}
-          <Route path="/setup-inventory" element={<SetUpInventory />} />
+          {/* =========================
+              🔐 PROTECTED INVENTORY SETUP
+              ========================= */}
+          <Route
+            path="/setup-inventory"
+            element={
+              <ProtectedDashboard>
+                <SetUpInventory />
+              </ProtectedDashboard>
+            }
+          />
 
-          {/* DASHBOARD */}
-          <Route path="/dashboard" element={<Dashboard />} />
-          <Route path="/edit-inventory" element={<EditInventory />} />
+          <Route
+            path="/edit-inventory"
+            element={
+              <ProtectedDashboard>
+                <EditInventory />
+              </ProtectedDashboard>
+            }
+          />
 
-          {/* ADMIN */}
-          <Route path="/admin" element={<AdminDashboard />} />
+          {/* =========================
+              🔥 PROTECTED DASHBOARD
+              ========================= */}
+          <Route
+            path="/dashboard"
+            element={
+              <ProtectedDashboard>
+                <Dashboard />
+              </ProtectedDashboard>
+            }
+          />
+
+          {/* =========================
+              🔥 PROTECTED ADMIN
+              ========================= */}
+          <Route
+            path="/admin"
+            element={
+              <ProtectedDashboard>
+                {user?.role === "admin" ? (
+                  <AdminDashboard />
+                ) : (
+                  <Navigate to="/dashboard" />
+                )}
+              </ProtectedDashboard>
+            }
+          />
+
         </Routes>
       </BrowserRouter>
 
-      {/* 🔥 TOAST UI */}
       <ToastContainer position="top-right" autoClose={3000} />
     </>
   );

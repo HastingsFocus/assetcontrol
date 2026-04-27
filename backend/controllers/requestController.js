@@ -1,8 +1,9 @@
 import Request from "../models/Request.js";
 import User from "../models/User.js";
 import Notification from "../models/Notification.js";
-import ItemType from "../models/ItemType.js"; // 🔥 IMPORTANT FIX
-import { sendNotification } from "../socket.js";
+import ItemType from "../models/ItemType.js";
+import { sendNotification, io } from "../socket.js"; // 🔥 include io
+import Item from "../models/Item.js";
 
 // ===============================
 // ✅ CREATE REQUEST (HOD)
@@ -11,16 +12,12 @@ export const createRequest = async (req, res) => {
   try {
     const { itemType, requiredDate, quantity, priority } = req.body;
 
-    // ✅ Validation
     if (!itemType || !requiredDate || !quantity || !priority) {
       return res.status(400).json({
         message: "All fields are required",
       });
     }
 
-    console.log("🔥 Creating request...");
-
-    // 🔐 SECURITY CHECK: VALIDATE ITEM TYPE + DEPARTMENT
     const type = await ItemType.findById(itemType);
 
     if (!type) {
@@ -35,26 +32,22 @@ export const createRequest = async (req, res) => {
       });
     }
 
-    // ✅ Create request
     const request = await Request.create({
       user: req.user._id,
       itemType,
-      itemName: type.name, // 🔥 derive name from DB (clean + safe)
+      itemName: type.name,
       requiredDate,
       quantity,
       priority,
       status: "pending",
+      department: req.user.department,
     });
 
     // 🔥 FIND ADMINS
     const admins = await User.find({ role: "admin" });
 
-    console.log("👥 Admins found:", admins.length);
-
     // 🔥 NOTIFY ADMINS
     for (const admin of admins) {
-      console.log("📢 Notifying admin:", admin._id);
-
       await Notification.create({
         user: admin._id,
         message: `New request for ${type.name}`,
@@ -75,7 +68,6 @@ export const createRequest = async (req, res) => {
     });
 
   } catch (error) {
-    console.error("❌ Create request error:", error);
     res.status(500).json({
       message: error.message || "Server error",
     });
@@ -83,7 +75,7 @@ export const createRequest = async (req, res) => {
 };
 
 // ===============================
-// ✅ GET MY REQUESTS (HOD)
+// ✅ GET MY REQUESTS
 // ===============================
 export const getMyRequests = async (req, res) => {
   try {
@@ -92,7 +84,6 @@ export const getMyRequests = async (req, res) => {
 
     res.json(requests);
   } catch (error) {
-    console.error("❌ getMyRequests error:", error);
     res.status(500).json({ message: "Server error" });
   }
 };
@@ -103,17 +94,10 @@ export const getMyRequests = async (req, res) => {
 export const getAllRequests = async (req, res) => {
   try {
     const requests = await Request.find()
-      .populate({
-        path: "user",
-        select: "name email department",
-      })
-      .populate({
-        path: "itemType",
-        select: "name",
-      })
+      .populate("user", "name email department")
+      .populate("itemType", "name")
       .sort({ createdAt: -1 });
 
-    // 🔥 safety cleanup (prevents frontend crash)
     const safeRequests = requests.map((r) => ({
       ...r.toObject(),
       user: r.user || {
@@ -126,31 +110,27 @@ export const getAllRequests = async (req, res) => {
 
     res.json(safeRequests);
   } catch (error) {
-    console.error("❌ getAllRequests error:", error);
     res.status(500).json({
-      message: error.message || "Server error in getAllRequests",
+      message: error.message || "Server error",
     });
   }
 };
 
-// ===============================
-// ✅ UPDATE STATUS (ADMIN)
-// ===============================
 export const updateRequestStatus = async (req, res) => {
   try {
     const { status, approvedQuantity } = req.body;
 
     const validStatuses = ["pending", "approved", "rejected"];
 
-    if (!validStatuses.includes(status) && status !== undefined) {
+    if (status && !validStatuses.includes(status)) {
       return res.status(400).json({
         message: "Invalid status",
       });
     }
 
-    // 🔍 Get request
     const request = await Request.findById(req.params.id)
-      .populate("itemType", "name");
+      .populate("itemType", "name")
+      .populate("user", "department");
 
     if (!request) {
       return res.status(404).json({
@@ -158,12 +138,10 @@ export const updateRequestStatus = async (req, res) => {
       });
     }
 
-    console.log("🔄 Updating request...");
-
     const updateData = {};
 
     // ================================
-    // 1️⃣ STATUS UPDATE (Approve/Reject)
+    // STATUS UPDATE
     // ================================
     if (status) {
       if (request.status === status) {
@@ -176,7 +154,7 @@ export const updateRequestStatus = async (req, res) => {
     }
 
     // ================================
-    // 2️⃣ APPROVED QUANTITY UPDATE
+    // APPROVED QUANTITY
     // ================================
     if (approvedQuantity !== undefined) {
       if (approvedQuantity <= 0) {
@@ -195,7 +173,50 @@ export const updateRequestStatus = async (req, res) => {
     }
 
     // ================================
-    // 3️⃣ UPDATE DB
+    // 🔥 INVENTORY UPDATE
+    // ================================
+    if (status === "approved") {
+      const qtyToAdd =
+        approvedQuantity !== undefined
+          ? approvedQuantity
+          : request.approvedQuantity || request.quantity;
+
+      const department = request.user.department;
+
+      let item = await Item.findOne({
+        itemType: request.itemType._id,
+        owner: request.user._id, // 🔥 USER, not admin
+      });
+
+      // 🔥 CREATE IF NOT EXISTS
+      if (!item) {
+        item = await Item.create({
+          itemType: request.itemType._id,
+          department,
+          owner: request.user._id,
+          conditions: {
+            good: 0,
+            fair: 0,
+            poor: 0,
+          },
+        });
+      }
+
+      // ✅ UPDATE STOCK
+      item.conditions.good += qtyToAdd;
+      item.lastUpdated = new Date();
+
+      await item.save();
+
+      // 🔥 REAL-TIME UPDATE (ONLY ONCE!)
+      io.emit("inventoryUpdated", {
+        itemType: request.itemType._id,
+        department,
+      });
+    }
+
+    // ================================
+    // UPDATE REQUEST
     // ================================
     const updatedRequest = await Request.findByIdAndUpdate(
       req.params.id,
@@ -207,7 +228,7 @@ export const updateRequestStatus = async (req, res) => {
       updatedRequest.itemType?.name || updatedRequest.itemName;
 
     // ================================
-    // 4️⃣ NOTIFICATIONS (SMART)
+    // NOTIFICATIONS
     // ================================
     let message = "";
 
@@ -242,9 +263,6 @@ export const updateRequestStatus = async (req, res) => {
       });
     }
 
-    // ================================
-    // 5️⃣ RESPONSE
-    // ================================
     res.json({
       message: "Request updated successfully",
       request: updatedRequest,

@@ -5,25 +5,23 @@ import socket from "../socket";
 export default function InventoryOverview() {
   const [data, setData] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(""); // 🔥 NEW
+  const [error, setError] = useState("");
 
   // 🔥 FETCH INVENTORY
   const fetchInventory = async () => {
     try {
       setLoading(true);
 
-      // 🔥 DEBUG TOKEN
       const token = localStorage.getItem("token");
       console.log("🔐 TOKEN:", token);
 
       const res = await API.get("/items/all");
 
       setData(res.data);
-      setError(""); // ✅ clear error if success
+      setError("");
     } catch (error) {
       console.error("❌ Failed to fetch inventory", error);
 
-      // 🔥 HANDLE DIFFERENT ERRORS
       if (error.response?.status === 403) {
         setError("Access denied. Please login again as admin.");
       } else {
@@ -34,14 +32,13 @@ export default function InventoryOverview() {
     }
   };
 
-  // 🔥 INITIAL LOAD + REAL-TIME SOCKET
+  // 🔥 ONE CLEAN useEffect
   useEffect(() => {
     fetchInventory();
 
-    // 🔥 LISTEN FOR REAL-TIME UPDATES
-    socket.on("inventoryUpdated", (data) => {
-      console.log("🔥 Real-time inventory update received:", data);
-      fetchInventory(); // refresh automatically
+    socket.on("inventoryUpdated", () => {
+      console.log("🔄 Inventory update received (admin)");
+      fetchInventory();
     });
 
     return () => {
@@ -65,22 +62,18 @@ export default function InventoryOverview() {
     <div>
       <h2>🏢 Department Inventory Overview</h2>
 
-      {/* ❌ ERROR DISPLAY */}
       {error && (
         <p style={{ color: "red", marginBottom: "10px" }}>
           {error}
         </p>
       )}
 
-      {/* 🔄 LOADING */}
       {loading && <p>Loading inventory...</p>}
 
-      {/* 🚫 NO DATA */}
       {!loading && data.length === 0 && !error && (
         <p>No inventory data available</p>
       )}
 
-      {/* ✅ DATA DISPLAY */}
       {!loading &&
         !error &&
         Object.keys(grouped).map((dept) => (

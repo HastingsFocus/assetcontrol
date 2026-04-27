@@ -1,30 +1,27 @@
 import { useEffect, useState } from "react";
 import API from "../services/api";
+import socket from "../socket";
 
 export default function EditInventory() {
   const [items, setItems] = useState([]);
   const [itemTypes, setItemTypes] = useState([]);
 
   // =========================
-  // 🔥 LOAD INVENTORY + TYPES
+  // 📦 FETCH INVENTORY
   // =========================
-  useEffect(() => {
-    fetchInventory();
-    fetchTypes();
-  }, []);
-
   const fetchInventory = async () => {
     try {
       const res = await API.get("/items/my-inventory");
-
-      console.log("🔥 INVENTORY DATA:", res.data);
-
+      console.log("📦 USER INVENTORY:", res.data);
       setItems(res.data);
     } catch (err) {
       console.log("Error loading inventory", err);
     }
   };
 
+  // =========================
+  // 📦 FETCH ITEM TYPES
+  // =========================
   const fetchTypes = async () => {
     try {
       const res = await API.get("/items/types");
@@ -33,6 +30,23 @@ export default function EditInventory() {
       console.log(err);
     }
   };
+
+  // =========================
+  // 🔄 INITIAL LOAD + SOCKET
+  // =========================
+  useEffect(() => {
+    fetchInventory();
+    fetchTypes();
+
+    socket.on("inventoryUpdated", () => {
+      console.log("🔄 Inventory update received (user)");
+      fetchInventory();
+    });
+
+    return () => {
+      socket.off("inventoryUpdated");
+    };
+  }, []);
 
   // =========================
   // ➕ ADD NEW ITEM
@@ -77,6 +91,7 @@ export default function EditInventory() {
       });
 
       alert("Item updated successfully");
+      fetchInventory();
     } catch (err) {
       console.log(err);
       alert("Update failed");
@@ -89,9 +104,7 @@ export default function EditInventory() {
   const handleDelete = async (id) => {
     try {
       await API.delete(`/items/my-item/${id}`);
-
       setItems(items.filter((item) => item._id !== id));
-
       alert("Item deleted");
     } catch (err) {
       console.log(err);

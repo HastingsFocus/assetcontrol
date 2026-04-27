@@ -14,6 +14,13 @@ const requestSchema = new mongoose.Schema(
       required: true,
     },
 
+    // 🔥 NEW: Department tracking (IMPORTANT FIX)
+    department: {
+      type: String,
+      required: true,
+      trim: true,
+    },
+
     itemName: {
       type: String,
       required: true,
@@ -39,6 +46,7 @@ const requestSchema = new mongoose.Schema(
 
     approvedQuantity: {
       type: Number,
+      default: null,
     },
 
     status: {

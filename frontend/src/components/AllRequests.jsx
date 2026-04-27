@@ -20,7 +20,9 @@ export default function AllRequests() {
     fetchRequests();
   }, []);
 
-  // ✅ Approve / Reject status
+  // ==============================
+  // ✅ UPDATE STATUS (APPROVE / REJECT)
+  // ==============================
   const updateStatus = async (id, status) => {
     try {
       const res = await API.put(`/requests/${id}`, { status });
@@ -32,17 +34,17 @@ export default function AllRequests() {
     }
   };
 
-  // ✅ Save approved quantity (AFTER approval)
+  // ==============================
+  // ✅ UPDATE APPROVED QUANTITY
+  // ==============================
   const updateApprovedQuantity = async () => {
     try {
       if (!approvedQty || approvedQty <= 0) {
-        alert("Enter a valid quantity");
-        return;
+        return alert("Enter a valid quantity");
       }
 
       if (approvedQty > selected.quantity) {
-        alert("Cannot exceed requested quantity");
-        return;
+        return alert("Cannot exceed requested quantity");
       }
 
       const res = await API.put(`/requests/${selected._id}`, {
@@ -57,12 +59,21 @@ export default function AllRequests() {
     }
   };
 
+  // ==============================
+  // 🎯 UI HELPERS
+  // ==============================
+  const getStatusColor = (status) => {
+    if (status === "approved") return "green";
+    if (status === "rejected") return "red";
+    return "orange";
+  };
+
   return (
     <div>
       <h2>📦 All Requests</h2>
 
-      {/* TABLE */}
-      <table border="1" cellPadding="10" style={{ width: "100%", marginTop: "20px" }}>
+      {/* ================= TABLE ================= */}
+      <table border="1" cellPadding="10" style={{ width: "100%", marginTop: 20 }}>
         <thead>
           <tr>
             <th>Item</th>
@@ -78,17 +89,17 @@ export default function AllRequests() {
           {requests.map((req) => (
             <tr key={req._id}>
               <td>{req.itemName}</td>
-              <td>{req.user?.department || "N/A"}</td>
+              <td>{req.department || req.user?.department || "N/A"}</td>
               <td>{req.quantity}</td>
               <td>{req.priority}</td>
-              <td>{req.status}</td>
+              <td style={{ color: getStatusColor(req.status), fontWeight: "bold" }}>
+                {req.status}
+              </td>
               <td>
-                <button
-                  onClick={() => {
-                    setSelected(req);
-                    setApprovedQty("");
-                  }}
-                >
+                <button onClick={() => {
+                  setSelected(req);
+                  setApprovedQty("");
+                }}>
                   View
                 </button>
               </td>
@@ -97,32 +108,20 @@ export default function AllRequests() {
         </tbody>
       </table>
 
-      {/* DETAILS PANEL */}
+      {/* ================= DETAILS PANEL ================= */}
       {selected && (
         <div style={{ marginTop: 20, padding: 20, border: "1px solid #ccc" }}>
           <h3>Request Details</h3>
 
           <p><strong>Item:</strong> {selected.itemName}</p>
-          <p><strong>Department:</strong> {selected.user?.department}</p>
+          <p><strong>Department:</strong> {selected.department || selected.user?.department}</p>
           <p><strong>Requested By:</strong> {selected.user?.name}</p>
           <p><strong>Email:</strong> {selected.user?.email}</p>
-
           <p><strong>Requested Quantity:</strong> {selected.quantity}</p>
 
-          {/* STATUS */}
           <p>
             <strong>Status:</strong>{" "}
-            <span
-              style={{
-                color:
-                  selected.status === "approved"
-                    ? "green"
-                    : selected.status === "rejected"
-                    ? "red"
-                    : "orange",
-                fontWeight: "bold",
-              }}
-            >
+            <span style={{ color: getStatusColor(selected.status), fontWeight: "bold" }}>
               {selected.status}
             </span>
           </p>
@@ -134,7 +133,7 @@ export default function AllRequests() {
               : "N/A"}
           </p>
 
-          {/* ACTION BUTTONS */}
+          {/* ================= ACTION BUTTONS ================= */}
           <div style={{ marginTop: 15 }}>
             <button
               onClick={() => updateStatus(selected._id, "approved")}
@@ -152,17 +151,14 @@ export default function AllRequests() {
             </button>
           </div>
 
-          {/* APPROVED QUANTITY SECTION (AFTER APPROVAL ONLY) */}
+          {/* ================= APPROVED QUANTITY ================= */}
           {selected.status === "approved" && (
             <div style={{ marginTop: 15 }}>
-              {/* If already saved */}
               {selected.approvedQuantity ? (
                 <p>
-                  <strong>Approved Quantity:</strong>{" "}
-                  {selected.approvedQuantity}
+                  <strong>Approved Quantity:</strong> {selected.approvedQuantity}
                 </p>
               ) : (
-                // If not yet saved
                 <div>
                   <label><strong>Enter Approved Quantity:</strong></label>
                   <br />
@@ -173,10 +169,7 @@ export default function AllRequests() {
                     onChange={(e) => setApprovedQty(Number(e.target.value))}
                   />
 
-                  <button
-                    onClick={updateApprovedQuantity}
-                    style={{ marginLeft: 10 }}
-                  >
+                  <button onClick={updateApprovedQuantity} style={{ marginLeft: 10 }}>
                     💾 Save Quantity
                   </button>
                 </div>

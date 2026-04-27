@@ -1,33 +1,42 @@
 import mongoose from "mongoose";
 
-const itemSchema = new mongoose.Schema({
-  itemType: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: "ItemType",
-    required: true,
+const itemSchema = new mongoose.Schema(
+  {
+    itemType: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "ItemType",
+      required: true,
+    },
+
+    conditions: {
+      good: { type: Number, default: 0, min: 0 },
+      fair: { type: Number, default: 0, min: 0 },
+      poor: { type: Number, default: 0, min: 0 },
+    },
+
+    owner: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+      required: true,
+    },
+
+    department: {
+      type: String,
+      required: true,
+      trim: true,
+    },
+
+    lastUpdated: {
+      type: Date,
+      default: Date.now,
+    },
   },
-
-  // 🔥 NEW STRUCTURE
-  conditions: {
-    good: { type: Number, default: 0 },
-    fair: { type: Number, default: 0 },
-    poor: { type: Number, default: 0 },
-  },
-
-  owner: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: "User",
-  },
-
-  department: String,
-
-  lastUpdated: {
-    type: Date,
-    default: Date.now,
+  {
+    timestamps: true,
   }
-});
+);
 
-// 🔥 VIRTUAL FIELD (AUTO TOTAL)
+// VIRTUAL FIELD (DO NOT EDIT DIRECTLY)
 itemSchema.virtual("totalQuantity").get(function () {
   return (
     (this.conditions.good || 0) +
@@ -36,12 +45,15 @@ itemSchema.virtual("totalQuantity").get(function () {
   );
 });
 
-// 🔥 INCLUDE VIRTUALS IN JSON RESPONSE
+// ENABLE VIRTUALS
 itemSchema.set("toJSON", { virtuals: true });
 itemSchema.set("toObject", { virtuals: true });
 
-// 🔥 prevent duplicates per user + item type
-itemSchema.index({ owner: 1, itemType: 1 }, { unique: true });
+// INDEX
+itemSchema.index(
+  { owner: 1, itemType: 1, department: 1 },
+  { unique: true }
+);
 
 const Item = mongoose.model("Item", itemSchema);
 

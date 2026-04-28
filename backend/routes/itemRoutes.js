@@ -8,7 +8,8 @@ import {
   getMyInventory,
   updateMyItem,
   deleteMyItem,
-  checkSetup, // ✅ ADD THIS
+  checkSetup,
+  createMyItem, 
 } from "../controllers/itemController.js";
 
 import { protect, adminOnly } from "../middleware/authMiddleware.js";
@@ -20,69 +21,41 @@ const router = express.Router();
 // 🔐 USER ROUTES
 // =======================
 
-// Get item types (requires login only)
+// Get item types
 router.get("/types", protect, getItemTypes);
 
-// =======================
-// 🔥 CHECK SETUP (VERY IMPORTANT)
-// =======================
-router.get(
-  "/check-my-setup",   
-  protect,
-  checkSetup
-);
+// Check setup status
+router.get("/check-my-setup", protect, checkSetup);
 
 // =======================
-// 🔥 INVENTORY SETUP ROUTE (NO setup check here)
+// 🔥 INVENTORY SETUP
 // =======================
 router.post("/setup", protect, setupInventory);
 
 // =======================
-// 🔐 PROTECTED INVENTORY ROUTES (MUST HAVE SETUP)
+// 🔐 USER INVENTORY (SETUP REQUIRED)
 // =======================
 
 // Get my inventory
-router.get(
-  "/my-inventory",
-  protect,
-  requireSetup,
-  getMyInventory
-);
+router.get("/my-inventory", protect, requireSetup, getMyInventory);
+
+// 🔥 CREATE NEW ITEM (MISSING BEFORE — THIS FIXES YOUR 404)
+router.post("/my-item", protect, requireSetup, createMyItem);
 
 // Update item
-router.put(
-  "/my-item/:id",
-  protect,
-  requireSetup,
-  updateMyItem
-);
+router.put("/my-item/:id", protect, requireSetup, updateMyItem);
 
 // Delete item
-router.delete(
-  "/my-item/:id",
-  protect,
-  requireSetup,
-  deleteMyItem
-);
+router.delete("/my-item/:id", protect, requireSetup, deleteMyItem);
 
 // =======================
 // 🔥 ADMIN ROUTES
 // =======================
 
-// Get all inventory (admin/hod)
-router.get(
-  "/all",
-  protect,
-  adminOnly,
-  getAllInventory
-);
+// Get all inventory
+router.get("/all", protect, adminOnly, getAllInventory);
 
-// Admin update condition
-router.put(
-  "/:id",
-  protect,
-  adminOnly,
-  updateCondition
-);
+// Update condition (admin stock control)
+router.put("/:id", protect, adminOnly, updateCondition);
 
 export default router;

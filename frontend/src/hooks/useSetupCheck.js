@@ -1,29 +1,36 @@
 import { useEffect, useState } from "react";
 import API from "../services/api";
-import { useNavigate } from "react-router-dom";
 
 export default function useSetupCheck(user) {
-  const navigate = useNavigate();
   const [checking, setChecking] = useState(true);
+  const [isSetup, setIsSetup] = useState(false);
 
   useEffect(() => {
-    const checkSetup = async () => {
-      if (!user) return;
-
-      if (user.role === "admin") {
+    // 🔒 No user → stop checking
+    if (!user) {
       setChecking(false);
       return;
     }
 
+    // 🔥 ADMINS SHOULD SKIP SETUP
+    if (user.role === "admin") {
+      setIsSetup(true);
+      setChecking(false);
+      return;
+    }
+
+    const checkSetup = async () => {
       try {
+        console.log("📡 Checking inventory setup...");
+
         const res = await API.get("/items/check-my-setup");
 
-if (!res.data.isSetup) {
-  navigate("/setup-inventory");
-}
+        console.log("🧪 SETUP CHECK RESULT:", res.data);
 
+        setIsSetup(res.data.isSetup);
       } catch (err) {
-        console.log(err);
+        console.log("❌ Setup check failed:", err);
+        setIsSetup(false); // safe fallback
       } finally {
         setChecking(false);
       }
@@ -32,5 +39,5 @@ if (!res.data.isSetup) {
     checkSetup();
   }, [user]);
 
-  return checking;
+  return { checking, isSetup };
 }

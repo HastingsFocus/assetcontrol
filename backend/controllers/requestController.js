@@ -123,26 +123,23 @@ export const updateRequestStatus = async (req, res) => {
     const validStatuses = ["pending", "approved", "rejected"];
 
     if (status && !validStatuses.includes(status)) {
-      return res.status(400).json({
-        message: "Invalid status",
-      });
+      return res.status(400).json({ message: "Invalid status" });
     }
 
+    // 🔥 FETCH REQUEST WITH FULL USER DATA (FIXED)
     const request = await Request.findById(req.params.id)
       .populate("itemType", "name")
-      .populate("user", "department");
+      .populate("user", "_id department"); // ✅ include _id
 
     if (!request) {
-      return res.status(404).json({
-        message: "Request not found",
-      });
+      return res.status(404).json({ message: "Request not found" });
     }
 
     const updateData = {};
 
-    // ================================
+    // ============================
     // STATUS UPDATE
-    // ================================
+    // ============================
     if (status) {
       if (request.status === status) {
         return res.status(400).json({
@@ -153,9 +150,9 @@ export const updateRequestStatus = async (req, res) => {
       updateData.status = status;
     }
 
-    // ================================
+    // ============================
     // APPROVED QUANTITY
-    // ================================
+    // ============================
     if (approvedQuantity !== undefined) {
       if (approvedQuantity <= 0) {
         return res.status(400).json({
@@ -171,96 +168,87 @@ export const updateRequestStatus = async (req, res) => {
 
       updateData.approvedQuantity = approvedQuantity;
     }
-
-    // ================================
-    // 🔥 INVENTORY UPDATE
-    // ================================
+     
+    // ============================
+    // INVENTORY UPDATE (ONLY ON APPROVE)
+    // ============================
     if (status === "approved") {
       const qtyToAdd =
-        approvedQuantity !== undefined
-          ? approvedQuantity
-          : request.approvedQuantity || request.quantity;
+        approvedQuantity ?? request.approvedQuantity ?? request.quantity;
 
       const department = request.user.department;
 
       let item = await Item.findOne({
         itemType: request.itemType._id,
-        owner: request.user._id, // 🔥 USER, not admin
+        owner: request.user._id,
       });
 
-      // 🔥 CREATE IF NOT EXISTS
       if (!item) {
         item = await Item.create({
           itemType: request.itemType._id,
           department,
           owner: request.user._id,
-          conditions: {
-            good: 0,
-            fair: 0,
-            poor: 0,
-          },
+          conditions: { good: 0, fair: 0, poor: 0 },
         });
       }
 
-      // ✅ UPDATE STOCK
       item.conditions.good += qtyToAdd;
       item.lastUpdated = new Date();
 
       await item.save();
 
-      // 🔥 REAL-TIME UPDATE (ONLY ONCE!)
+      console.log("📦 Inventory updated for user:", request.user._id);
+
+      // 🔥 REAL-TIME INVENTORY UPDATE
       io.emit("inventoryUpdated", {
         itemType: request.itemType._id,
         department,
       });
     }
 
-    // ================================
+    // ============================
     // UPDATE REQUEST
-    // ================================
+    // ============================
     const updatedRequest = await Request.findByIdAndUpdate(
       req.params.id,
       updateData,
       { new: true }
     ).populate("itemType", "name");
 
-    const itemName =
-      updatedRequest.itemType?.name || updatedRequest.itemName;
+    // ============================
+    // 🔔 NOTIFICATIONS (DEBUG + SAFE)
+    // ============================
+    if (status === "approved" || status === "rejected") {
+      const message =
+        status === "approved"
+          ? `Your request for ${request.itemType.name} was approved`
+          : `Your request for ${request.itemType.name} was rejected`;
 
-    // ================================
-    // NOTIFICATIONS
-    // ================================
-    let message = "";
+      console.log("🔔 Creating notification...");
+      console.log("👤 Target user:", request.user?._id);
+      console.log("📩 Message:", message);
 
-    if (status === "approved") {
-      message = `Your request for ${itemName} was approved`;
-
-      if (updatedRequest.approvedQuantity) {
-        message += ` (Qty: ${updatedRequest.approvedQuantity})`;
-      }
-    }
-
-    if (status === "rejected") {
-      message = `Your request for ${itemName} was rejected`;
-    }
-
-    if (approvedQuantity !== undefined && !status) {
-      message = `Approved quantity updated for ${itemName} (Qty: ${approvedQuantity})`;
-    }
-
-    if (message) {
-      await Notification.create({
-        user: updatedRequest.user,
+      // 🔥 SAVE TO DB
+      const notification = await Notification.create({
+        user: request.user._id,
         message,
         type: "status_updated",
-        request: updatedRequest._id,
+        request: request._id,
       });
 
-      sendNotification(updatedRequest.user, {
+      console.log("✅ Notification saved:", notification);
+
+      // 🔥 REAL-TIME SEND
+      sendNotification(request.user._id, {
+        _id: notification._id, // include ID for frontend
         message,
         type: "status_updated",
-        request: updatedRequest._id,
+        request: request._id,
+        createdAt: notification.createdAt,
+        isRead: false,
       });
+
+      console.log("📡 Notification emitted via socket");
     }
 
     res.json({

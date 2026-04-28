@@ -7,11 +7,8 @@ import { useAuth } from "./context/AuthContext";
 // 🔐 Guards
 import ProtectedDashboard from "./guards/ProtectedDashboards";
 
-// Toast
-import { ToastContainer, toast } from "react-toastify";
-import "react-toastify/dist/ReactToastify.css";
-
-// Pages
+// 🔔 Pages
+import Notifications from "./components/Notifications";
 import Login from "./pages/Login";
 import Register from "./pages/Register";
 import Dashboard from "./pages/Dashboard";
@@ -19,11 +16,15 @@ import AdminDashboard from "./pages/admin/AdminDashboard";
 import SetUpInventory from "./pages/SetUpInventory.jsx";
 import EditInventory from "./pages/EditInventory";
 
+// 🔔 Toast
+import { ToastContainer, toast } from "react-toastify";
+import "react-toastify/dist/ReactToastify.css";
+
 function App() {
   const { user, token, login, logout } = useAuth();
 
   // =========================
-  // 🔐 SESSION RESTORE
+  // 🔐 SESSION RESTORE + SOCKET REGISTER
   // =========================
   useEffect(() => {
     const loadUser = async () => {
@@ -35,8 +36,10 @@ function App() {
 
         login({ user: userData, token });
 
+        // 🔥 REGISTER SOCKET (FIXED)
         if (userData?._id) {
-          socket.emit("register", userData._id);
+          socket.emit("register", userData._id.toString());
+          console.log("🟢 Socket registered:", userData._id.toString());
         }
 
       } catch (err) {
@@ -49,16 +52,20 @@ function App() {
   }, [token]);
 
   // =========================
-  // 🔔 SOCKET LISTENER
+  // 🔔 GLOBAL SOCKET LISTENER (IMPORTANT FIX)
   // =========================
   useEffect(() => {
     const handleNotification = (data) => {
+      console.log("🔥 GLOBAL SOCKET RECEIVED:", data);
       toast.info(data.message);
     };
+
+    console.log("🟡 Registering global notification listener");
 
     socket.on("notification", handleNotification);
 
     return () => {
+      console.log("🧹 Removing global notification listener");
       socket.off("notification", handleNotification);
     };
   }, []);
@@ -70,14 +77,14 @@ function App() {
 
           {/* =========================
               🔥 PUBLIC ROUTES
-              ========================= */}
+          ========================= */}
           <Route path="/" element={<Navigate to="/login" />} />
           <Route path="/login" element={<Login />} />
           <Route path="/register" element={<Register />} />
 
           {/* =========================
-              🔐 PROTECTED INVENTORY SETUP
-              ========================= */}
+              🔐 INVENTORY SETUP
+          ========================= */}
           <Route
             path="/setup-inventory"
             element={
@@ -97,8 +104,8 @@ function App() {
           />
 
           {/* =========================
-              🔥 PROTECTED DASHBOARD
-              ========================= */}
+              🔥 USER DASHBOARD
+          ========================= */}
           <Route
             path="/dashboard"
             element={
@@ -109,8 +116,20 @@ function App() {
           />
 
           {/* =========================
-              🔥 PROTECTED ADMIN
-              ========================= */}
+              🔔 NOTIFICATIONS PAGE
+          ========================= */}
+          <Route
+            path="/notifications"
+            element={
+              <ProtectedDashboard>
+                <Notifications />
+              </ProtectedDashboard>
+            }
+          />
+
+          {/* =========================
+              🔥 ADMIN DASHBOARD
+          ========================= */}
           <Route
             path="/admin"
             element={
@@ -127,6 +146,7 @@ function App() {
         </Routes>
       </BrowserRouter>
 
+      {/* 🔔 TOAST UI */}
       <ToastContainer position="top-right" autoClose={3000} />
     </>
   );

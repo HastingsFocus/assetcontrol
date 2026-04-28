@@ -6,21 +6,24 @@ let io;
 // 🔥 INIT SOCKET SERVER
 export const initSocket = (app) => {
   const server = http.createServer(app);
-io = new Server(server, {
-  cors: {
-    origin: "http://localhost:5173", // ✅ your frontend URL
-    credentials: true,               // ✅ allow credentials
-  },
-});
+
+  io = new Server(server, {
+    cors: {
+      origin: "http://localhost:5173",
+      credentials: true,
+    },
+  });
 
   io.on("connection", (socket) => {
     console.log("🟢 New client connected:", socket.id);
 
-    // ✅ JOIN USER ROOM
     socket.on("register", (userId) => {
-      socket.join(userId);
-      console.log("👤 User registered:", userId);
-    });
+  const id = userId.toString(); // 🔥 FORCE STRING
+
+  socket.join(id);
+
+  console.log("👤 User joined room:", id);
+});
 
     socket.on("disconnect", () => {
       console.log("🔴 Client disconnected:", socket.id);
@@ -31,28 +34,22 @@ io = new Server(server, {
 };
 
 //
-// 🔔 SEND TO SPECIFIC USER (FIXES YOUR ERROR)
+// 🔔 SEND NOTIFICATION (ROOM BASED - CLEAN FIX)
 //
 export const sendNotification = (userId, data) => {
-  if (!io) {
-    console.log("❌ Socket not initialized");
-    return;
-  }
+  const id = userId.toString(); // 🔥 FIX HERE
 
-  io.to(userId).emit("notification", data);
+  console.log("📡 Sending notification to room:", id);
+
+  io.to(id).emit("notification", data);
 };
-
 //
-// 📡 BROADCAST TO ALL ADMINS / USERS
+// 📡 INVENTORY BROADCAST
 //
 export const broadcastInventoryUpdate = (data) => {
-  if (!io) {
-    console.log("❌ Socket not initialized");
-    return;
-  }
+  if (!io) return;
 
   io.emit("inventoryUpdated", data);
 };
 
-// OPTIONAL EXPORT
 export { io };

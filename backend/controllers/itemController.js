@@ -46,9 +46,7 @@ export const getItemTypes = async (req, res) => {
   }
 };
 
-// ==========================
-// 🔥 SETUP INVENTORY (FIXED + SAFE)
-// ==========================
+
 export const setupInventory = async (req, res) => {
   try {
     const userId = req.user._id;
@@ -147,9 +145,6 @@ export const getMyInventory = async (req, res) => {
   }
 };
 
-// ==========================
-// 🔥 ADMIN: GET ALL INVENTORY
-// ==========================
 export const getAllInventory = async (req, res) => {
   try {
     if (!["admin", "hod"].includes(req.user.role)) {
@@ -184,40 +179,60 @@ export const getAllInventory = async (req, res) => {
   }
 };
 
-// ==========================
-// ✅ UPDATE MY ITEM
-// ==========================
+
 export const updateMyItem = async (req, res) => {
   try {
+    const { id } = req.params;
+
+    // =========================
+    // 🔒 VALIDATION: ID CHECK
+    // =========================
+    if (!id || id === "null") {
+      return res.status(400).json({
+        message: "Invalid item ID",
+      });
+    }
+
     const item = await Item.findOne({
-      _id: req.params.id,
+      _id: id,
       owner: req.user._id,
     });
 
     if (!item) {
       return res.status(404).json({
-        message: "Item not found",
+        message: "Item not found or unauthorized",
       });
     }
 
-    Object.assign(item, req.body);
-    item.lastUpdated = Date.now();
+       if (req.body.itemType) {
+      item.itemType = req.body.itemType;
+    }
+
+    // 🔥 Ensure conditions exist safely
+    if (req.body.conditions) {
+      item.conditions = {
+        good: req.body.conditions.good || 0,
+        fair: req.body.conditions.fair || 0,
+        poor: req.body.conditions.poor || 0,
+      };
+    }
+
+    item.lastUpdated = new Date();
 
     await item.save();
 
-    res.json(item);
+    return res.json(item);
 
   } catch (error) {
     console.error("❌ UPDATE ITEM ERROR:", error);
-    res.status(500).json({
+
+    return res.status(500).json({
       message: "Update failed",
     });
   }
 };
 
-// ==========================
-// 🔥 ADMIN UPDATE CONDITION
-// ==========================
+
 export const updateCondition = async (req, res) => {
   try {
     const { conditions } = req.body;
@@ -245,9 +260,6 @@ export const updateCondition = async (req, res) => {
   }
 };
 
-// ==========================
-// 🗑 DELETE MY ITEM
-// ==========================
 export const deleteMyItem = async (req, res) => {
   try {
     const item = await Item.findOneAndDelete({
@@ -273,4 +285,25 @@ export const deleteMyItem = async (req, res) => {
   }
 };
 
+export const createMyItem = async (req, res) => {
+  try {
+    const { itemType, conditions } = req.body;
 
+    if (!itemType) {
+      return res.status(400).json({ message: "Item type required" });
+    }
+
+    const item = await Item.create({
+      itemType,
+      owner: req.user._id,
+      department: req.user.department,
+      conditions: conditions || { good: 0, fair: 0, poor: 0 },
+      lastUpdated: new Date(),
+    });
+
+    res.status(201).json(item);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: "Create failed" });
+  }
+};

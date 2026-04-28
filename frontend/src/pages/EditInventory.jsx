@@ -12,7 +12,6 @@ export default function EditInventory() {
   const fetchInventory = async () => {
     try {
       const res = await API.get("/items/my-inventory");
-      console.log("📦 USER INVENTORY:", res.data);
       setItems(res.data);
     } catch (err) {
       console.log("Error loading inventory", err);
@@ -32,28 +31,30 @@ export default function EditInventory() {
   };
 
   // =========================
-  // 🔄 INITIAL LOAD + SOCKET
+  // 🔄 INIT + SOCKET
   // =========================
   useEffect(() => {
     fetchInventory();
     fetchTypes();
 
-    socket.on("inventoryUpdated", () => {
+    const handleUpdate = () => {
       console.log("🔄 Inventory update received (user)");
       fetchInventory();
-    });
+    };
+
+    socket.on("inventoryUpdated", handleUpdate);
 
     return () => {
-      socket.off("inventoryUpdated");
+      socket.off("inventoryUpdated", handleUpdate);
     };
   }, []);
 
   // =========================
-  // ➕ ADD NEW ITEM
+  // ➕ ADD ITEM
   // =========================
   const addNewItem = () => {
-    setItems([
-      ...items,
+    setItems((prev) => [
+      ...prev,
       {
         _id: null,
         itemType: "",
@@ -63,49 +64,67 @@ export default function EditInventory() {
   };
 
   // =========================
-  // 🔄 ITEM TYPE CHANGE
+  // 🔄 ITEM TYPE
   // =========================
   const handleItemTypeChange = (index, value) => {
-    const updated = [...items];
-    updated[index].itemType = value;
-    setItems(updated);
+    setItems((prev) => {
+      const updated = [...prev];
+      updated[index].itemType = value;
+      return updated;
+    });
   };
 
   // =========================
-  // 🔄 CONDITIONS CHANGE
+  // 🔄 CONDITIONS
   // =========================
   const handleConditionChange = (index, type, value) => {
-    const updated = [...items];
-    updated[index].conditions[type] = Number(value);
-    setItems(updated);
+    setItems((prev) => {
+      const updated = [...prev];
+
+      if (!updated[index].conditions) {
+        updated[index].conditions = { good: 0, fair: 0, poor: 0 };
+      }
+
+      updated[index].conditions[type] = Number(value);
+      return updated;
+    });
   };
 
-  // =========================
-  // 💾 UPDATE ITEM
-  // =========================
+  
   const handleUpdate = async (item) => {
-    try {
-      await API.put(`/items/my-item/${item._id}`, {
-        itemType: item.itemType._id || item.itemType,
+  try {
+    // 🆕 CREATE NEW ITEM
+    if (!item._id) {
+      await API.post("/items/my-item", {
+        itemType: item.itemType,
         conditions: item.conditions,
       });
 
-      alert("Item updated successfully");
+      alert("Item created successfully");
       fetchInventory();
-    } catch (err) {
-      console.log(err);
-      alert("Update failed");
+      return;
     }
-  };
 
+    // ✏️ UPDATE EXISTING ITEM
+    await API.put(`/items/my-item/${item._id}`, {
+      itemType: item.itemType?._id || item.itemType,
+      conditions: item.conditions,
+    });
+
+    alert("Item updated successfully");
+    fetchInventory();
+  } catch (err) {
+    console.log(err);
+    alert("Save failed");
+  }
+};
   // =========================
-  // 🗑️ DELETE ITEM
+  // 🗑️ DELETE
   // =========================
   const handleDelete = async (id) => {
     try {
       await API.delete(`/items/my-item/${id}`);
-      setItems(items.filter((item) => item._id !== id));
-      alert("Item deleted");
+      setItems((prev) => prev.filter((i) => i._id !== id));
     } catch (err) {
       console.log(err);
       alert("Delete failed");
@@ -135,7 +154,7 @@ export default function EditInventory() {
           >
             {/* ITEM TYPE */}
             <select
-              value={item.itemType?._id || item.itemType}
+              value={item.itemType?._id || item.itemType || ""}
               onChange={(e) =>
                 handleItemTypeChange(index, e.target.value)
               }
@@ -155,7 +174,7 @@ export default function EditInventory() {
               <label>Good: </label>
               <input
                 type="number"
-                value={item.conditions?.good || 0}
+                value={item.conditions?.good ?? 0}
                 onChange={(e) =>
                   handleConditionChange(index, "good", e.target.value)
                 }
@@ -164,7 +183,7 @@ export default function EditInventory() {
               <label style={{ marginLeft: 10 }}>Fair: </label>
               <input
                 type="number"
-                value={item.conditions?.fair || 0}
+                value={item.conditions?.fair ?? 0}
                 onChange={(e) =>
                   handleConditionChange(index, "fair", e.target.value)
                 }
@@ -173,7 +192,7 @@ export default function EditInventory() {
               <label style={{ marginLeft: 10 }}>Poor: </label>
               <input
                 type="number"
-                value={item.conditions?.poor || 0}
+                value={item.conditions?.poor ?? 0}
                 onChange={(e) =>
                   handleConditionChange(index, "poor", e.target.value)
                 }
@@ -213,7 +232,6 @@ export default function EditInventory() {
         ))
       )}
 
-      {/* ADD NEW ITEM */}
       <br />
       <button onClick={addNewItem}>➕ Add Item</button>
     </div>

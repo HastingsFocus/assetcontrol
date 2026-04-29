@@ -132,60 +132,58 @@ export default function SetupInventory() {
     return getTotal(item.conditions) === 0;
   });
 
-  // =========================
-  // 🚀 SUBMIT
-  // =========================
   const submit = async () => {
-    if (hasDuplicate) {
-      toast.error("Duplicate items not allowed");
-      return;
+  if (hasDuplicate) {
+    toast.error("Duplicate items not allowed");
+    return;
+  }
+
+  if (hasInvalid) {
+    toast.error("Each item must have at least 1 quantity");
+    return;
+  }
+
+  try {
+    setSaving(true);
+
+    const newItems = items.filter((i) => !i._id);
+    const existingItems = items.filter((i) => i._id);
+
+    await Promise.all(
+      existingItems.map((item) =>
+        API.put(`/items/my-item/${item._id}`, {
+          itemType: item.itemType,
+          conditions: item.conditions,
+        })
+      )
+    );
+
+    if (newItems.length > 0) {
+      await API.post("/items/setup", {
+        items: newItems.map((item) => ({
+          itemType: item.itemType,
+          conditions: item.conditions,
+        })),
+      });
     }
 
-    if (hasInvalid) {
-      toast.error("Each item must have at least 1 quantity");
-      return;
-    }
+    toast.success("Inventory setup completed successfully 🚀");
 
-    try {
-      setSaving(true);
+    // 🔥 Navigate immediately
+    navigate("/dashboard", { replace: true });
 
-      const newItems = items.filter((i) => !i._id);
-      const existingItems = items.filter((i) => i._id);
+    // 🔥 Background update (non-blocking)
+    API.put("/settings/setup-complete").catch(() => {});
 
-      await Promise.all(
-        existingItems.map((item) =>
-          API.put(`/items/my-item/${item._id}`, {
-            itemType: item.itemType,
-            conditions: item.conditions,
-          })
-        )
-      );
-
-      if (newItems.length > 0) {
-        await API.post("/items/setup", {
-          items: newItems.map((item) => ({
-            itemType: item.itemType,
-            conditions: item.conditions,
-          })),
-        });
-      }
-
-      await API.put("/settings/setup-complete");
-
-      toast.success("Inventory setup completed successfully 🚀");
-
-      // 🔥 SAFE NAVIGATION
-      navigate("/dashboard", { replace: true });
-
-    } catch (error) {
-      console.log(error);
-      toast.error(
-        error.response?.data?.message || "Failed to save inventory"
-      );
-    } finally {
-      setSaving(false);
-    }
-  };
+  } catch (error) {
+    console.log(error);
+    toast.error(
+      error.response?.data?.message || "Failed to save inventory"
+    );
+  } finally {
+    setSaving(false);
+  }
+};
 
   // =========================
   // ⏳ LOADING UI (AUTH SAFE)

@@ -7,7 +7,7 @@ console.log("🔌 SOCKET URL:", URL);
 
 const socket = io(URL, {
   withCredentials: true,
-  transports: ["websocket"], // 🔥 IMPORTANT (Render fix)
+  transports: ["websocket"], // 🔥 important for Render
 });
 
 export default socket;

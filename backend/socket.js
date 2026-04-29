@@ -9,7 +9,10 @@ export const initSocket = (app) => {
 
   io = new Server(server, {
     cors: {
-      origin: "http://localhost:5173",
+      origin: [
+        "http://localhost:5173", // ✅ dev
+        "https://assetcontrol-xilu.onrender.com", 
+      ],
       credentials: true,
     },
   });
@@ -17,13 +20,16 @@ export const initSocket = (app) => {
   io.on("connection", (socket) => {
     console.log("🟢 New client connected:", socket.id);
 
+    // 🔥 REGISTER USER ROOM
     socket.on("register", (userId) => {
-  const id = userId.toString(); // 🔥 FORCE STRING
+      if (!userId) return;
 
-  socket.join(id);
+      const id = userId.toString();
 
-  console.log("👤 User joined room:", id);
-});
+      socket.join(id);
+
+      console.log("👤 User joined room:", id);
+    });
 
     socket.on("disconnect", () => {
       console.log("🔴 Client disconnected:", socket.id);
@@ -34,15 +40,18 @@ export const initSocket = (app) => {
 };
 
 //
-// 🔔 SEND NOTIFICATION (ROOM BASED - CLEAN FIX)
+// 🔔 SEND NOTIFICATION
 //
 export const sendNotification = (userId, data) => {
-  const id = userId.toString(); // 🔥 FIX HERE
+  if (!io) return;
+
+  const id = userId.toString();
 
   console.log("📡 Sending notification to room:", id);
 
   io.to(id).emit("notification", data);
 };
+
 //
 // 📡 INVENTORY BROADCAST
 //

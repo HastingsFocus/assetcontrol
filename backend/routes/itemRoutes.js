@@ -9,11 +9,12 @@ import {
   updateMyItem,
   deleteMyItem,
   checkSetup,
-  createMyItem, 
+  createMyItem,
 } from "../controllers/itemController.js";
 
 import { protect, adminOnly } from "../middleware/authMiddleware.js";
-import { requireSetup } from "../middleware/setupMiddleware.js";
+// ❌ remove requireSetup from here (not needed for inventory flow)
+// import { requireSetup } from "../middleware/setupMiddleware.js";
 
 const router = express.Router();
 
@@ -30,32 +31,30 @@ router.get("/check-my-setup", protect, checkSetup);
 // =======================
 // 🔥 INVENTORY SETUP
 // =======================
+
+// Initial setup (allowed before setup is complete)
 router.post("/setup", protect, setupInventory);
 
 // =======================
-// 🔐 USER INVENTORY (SETUP REQUIRED)
+// 🔐 USER INVENTORY (FIXED)
 // =======================
 
-// Get my inventory
-router.get("/my-inventory", protect, requireSetup, getMyInventory);
+// ✅ DO NOT BLOCK WITH requireSetup
 
-// 🔥 CREATE NEW ITEM (MISSING BEFORE — THIS FIXES YOUR 404)
-router.post("/my-item", protect, requireSetup, createMyItem);
+router.get("/my-inventory", protect, getMyInventory);
 
-// Update item
-router.put("/my-item/:id", protect, requireSetup, updateMyItem);
+router.post("/my-item", protect, createMyItem);
 
-// Delete item
-router.delete("/my-item/:id", protect, requireSetup, deleteMyItem);
+router.put("/my-item/:id", protect, updateMyItem);
+
+router.delete("/my-item/:id", protect, deleteMyItem);
 
 // =======================
 // 🔥 ADMIN ROUTES
 // =======================
 
-// Get all inventory
 router.get("/all", protect, adminOnly, getAllInventory);
 
-// Update condition (admin stock control)
 router.put("/:id", protect, adminOnly, updateCondition);
 
 export default router;

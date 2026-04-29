@@ -1,20 +1,14 @@
-import dotenv from "dotenv";
-import mongoose from "mongoose";
 import ItemType from "../models/ItemType.js";
 
-dotenv.config();
-
-// 🔥 connect to MongoDB Atlas
-mongoose.connect(process.env.MONGO_URI)
-  .then(() => console.log("✅ MongoDB connected for seeding"))
-  .catch(err => {
-    console.error("❌ DB connection error:", err);
-    process.exit(1);
-  });
-
-const seed = async () => {
+const seedItemTypes = async () => {
   try {
-    await ItemType.deleteMany();
+    const count = await ItemType.countDocuments();
+
+    // 🔥 Prevent reseeding every restart
+    if (count > 0) {
+      console.log("⚡ Item types already exist, skipping seeding...");
+      return;
+    }
 
     await ItemType.insertMany([
       { name: "Desktop Computer", departments: ["ICT", "Accounts", "Library"] },
@@ -63,12 +57,9 @@ const seed = async () => {
     ]);
 
     console.log("🔥 Item types seeded successfully");
-
-    process.exit(); // stop script
   } catch (error) {
     console.error("❌ Seeding error:", error);
-    process.exit(1);
   }
 };
 
-seed();
+export default seedItemTypes;

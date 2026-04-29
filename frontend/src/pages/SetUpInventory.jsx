@@ -132,7 +132,9 @@ export default function SetupInventory() {
     return getTotal(item.conditions) === 0;
   });
 
-  const submit = async () => {
+  const { user, loading: authLoading, refreshUser } = useAuth();
+
+const submit = async () => {
   if (hasDuplicate) {
     toast.error("Duplicate items not allowed");
     return;
@@ -149,6 +151,7 @@ export default function SetupInventory() {
     const newItems = items.filter((i) => !i._id);
     const existingItems = items.filter((i) => i._id);
 
+    // 🔄 update existing
     await Promise.all(
       existingItems.map((item) =>
         API.put(`/items/my-item/${item._id}`, {
@@ -158,6 +161,7 @@ export default function SetupInventory() {
       )
     );
 
+    // ➕ create new
     if (newItems.length > 0) {
       await API.post("/items/setup", {
         items: newItems.map((item) => ({
@@ -167,13 +171,16 @@ export default function SetupInventory() {
       });
     }
 
+    // 🔥 MARK SETUP COMPLETE (IMPORTANT)
+    await API.put("/settings/setup-complete");
+
+    // 🔥 REFRESH USER FROM BACKEND
+    await refreshUser();
+
     toast.success("Inventory setup completed successfully 🚀");
 
-    // 🔥 Navigate immediately
+    // 🔥 NOW SAFE TO NAVIGATE
     navigate("/dashboard", { replace: true });
-
-    // 🔥 Background update (non-blocking)
-    API.put("/settings/setup-complete").catch(() => {});
 
   } catch (error) {
     console.log(error);

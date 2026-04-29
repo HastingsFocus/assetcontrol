@@ -1,9 +1,10 @@
 import jwt from "jsonwebtoken";
+import User from "../models/User.js";
 
-const protect = (req, res, next) => {
+const protect = async (req, res, next) => {
   let token;
 
-  // 🔥 Get token from header
+  // 🔍 Get token
   if (
     req.headers.authorization &&
     req.headers.authorization.startsWith("Bearer")
@@ -12,22 +13,39 @@ const protect = (req, res, next) => {
   }
 
   if (!token) {
-    return res.status(401).json({ message: "Not authorized, no token" });
+    return res.status(401).json({
+      message: "Not authorized, no token",
+    });
   }
 
   try {
+    // 🔐 Verify token
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
 
-    // 🔥 STRUCTURED USER OBJECT (IMPORTANT FIX)
+    // 🔥 GET FRESH USER FROM DB (CRITICAL FIX)
+    const user = await User.findById(decoded.id).select("-password");
+
+    if (!user) {
+      return res.status(401).json({
+        message: "User not found",
+      });
+    }
+
+    // 🔥 STANDARDIZED USER OBJECT
     req.user = {
-      id: decoded.id,
-      role: decoded.role,
-      department: decoded.department,
+      _id: user._id,  // ✅ FIXED
+      name: user.name,
+      email: user.email,
+      role: user.role,
+      department: user.department,
+      inventorySetupComplete: user.inventorySetupComplete,
     };
 
     next();
   } catch (error) {
-    return res.status(401).json({ message: "Token failed or expired" });
+    return res.status(401).json({
+      message: "Token invalid or expired",
+    });
   }
 };
 

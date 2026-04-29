@@ -16,125 +16,140 @@ const generateToken = (user) => {
   );
 };
 
-// ======================
-// ✅ REGISTER
-// ======================
 export const registerUser = async (req, res) => {
-  const { name, email, password } = req.body;
+  try {
+    const { name, email, password } = req.body;
 
-  if (!name || !email || !password) {
-    return res.status(400).json({
-      message: "Please provide name, email and password",
+    if (!name || !email || !password) {
+      return res.status(400).json({
+        message: "Please provide name, email and password",
+      });
+    }
+
+    const allowed = allowedUsers.find((u) => u.email === email);
+
+    if (!allowed) {
+      return res.status(403).json({
+        message: "Email not authorized",
+      });
+    }
+
+    const userExists = await User.findOne({ email });
+
+    if (userExists) {
+      return res.status(400).json({
+        message: "User already exists",
+      });
+    }
+
+    const hashedPassword = await bcrypt.hash(password, 10);
+
+    const user = await User.create({
+      name,
+      email,
+      password: hashedPassword,
+      role: allowed.role,
+      department: allowed.department,
+      inventorySetupComplete: false,
+    });
+
+    return res.status(201).json({
+      message: "Registration successful",
+      user: {
+        _id: user._id,
+        name: user.name,
+        email: user.email,
+        role: user.role,
+        department: user.department,
+        inventorySetupComplete: user.inventorySetupComplete,
+      },
+    });
+
+  } catch (err) {
+    return res.status(500).json({
+      message: "Server error during registration",
     });
   }
-
-  const allowed = allowedUsers.find((u) => u.email === email);
-
-  if (!allowed) {
-    return res.status(403).json({
-      message: "Email not authorized",
-    });
-  }
-
-  const userExists = await User.findOne({ email });
-
-  if (userExists) {
-    return res.status(400).json({
-      message: "User already exists",
-    });
-  }
-
-  const hashedPassword = await bcrypt.hash(password, 10);
-
-  const user = await User.create({
-    name,
-    email,
-    password: hashedPassword,
-    role: allowed.role,
-    department: allowed.department,
-    inventorySetupComplete: false,
-  });
-
-  return res.status(201).json({
-    message: "Registration successful",
-    user: {
-      _id: user._id,
-      name: user.name,
-      email: user.email,
-      role: user.role,
-      department: user.department,
-      inventorySetupComplete: user.inventorySetupComplete,
-    },
-  });
 };
 
-// ======================
-// ✅ LOGIN (FIXED)
-// ======================
 export const loginUser = async (req, res) => {
-  const { email, password } = req.body;
+  try {
+    const { email, password } = req.body;
 
-  if (!email || !password) {
-    return res.status(400).json({
-      message: "Please provide email and password",
+    if (!email || !password) {
+      return res.status(400).json({
+        message: "Please provide email and password",
+      });
+    }
+
+    const user = await User.findOne({ email });
+
+    if (!user) {
+      return res.status(400).json({
+        message: "Invalid email or password",
+      });
+    }
+
+    const isMatch = await bcrypt.compare(password, user.password);
+
+    if (!isMatch) {
+      return res.status(400).json({
+        message: "Invalid email or password",
+      });
+    }
+
+    const token = generateToken(user);
+
+    return res.json({
+      token,
+      user: {
+        _id: user._id,
+        name: user.name,
+        email: user.email,
+        role: user.role,
+        department: user.department,
+        inventorySetupComplete: user.inventorySetupComplete,
+      },
+    });
+
+  } catch (err) {
+    return res.status(500).json({
+      message: "Server error during login",
     });
   }
-
-  const user = await User.findOne({ email });
-
-  if (!user) {
-    return res.status(400).json({
-      message: "Invalid email or password",
-    });
-  }
-
-  const isMatch = await bcrypt.compare(password, user.password);
-
-  if (!isMatch) {
-    return res.status(400).json({
-      message: "Invalid email or password",
-    });
-  }
-
-  // 🔥 TOKEN (NOW INCLUDES ROLE + DEPARTMENT)
-  const token = generateToken(user);
-
-  return res.json({
-    token,
-    user: {
-      _id: user._id,
-      name: user.name,
-      email: user.email,
-      role: user.role,
-      department: user.department,
-      inventorySetupComplete: user.inventorySetupComplete,
-    },
-  });
 };
 
-// ======================
-// ✅ GET CURRENT USER
-// ======================
 export const getMe = async (req, res) => {
   try {
-    if (!req.user) {
+    if (!req.user?._id) {
       return res.status(401).json({
         message: "Not authorized",
       });
     }
 
-    res.json({
+    // 🔥 ALWAYS fetch fresh user from DB
+    const user = await User.findById(req.user._id).select("-password");
+
+    if (!user) {
+      return res.status(404).json({
+        message: "User not found",
+      });
+    }
+
+    return res.json({
       user: {
-        _id: req.user._id,
-        name: req.user.name,
-        email: req.user.email,
-        role: req.user.role,
-        department: req.user.department,
-        inventorySetupComplete: req.user.inventorySetupComplete,
+        _id: user._id,
+        name: user.name,
+        email: user.email,
+        role: user.role,
+        department: user.department,
+        inventorySetupComplete: user.inventorySetupComplete,
       },
     });
 
   } catch (error) {
-    res.status(500).json({ message: "Server error" });
+    return res.status(500).json({
+      message: "Server error",
+    });
   }
 };

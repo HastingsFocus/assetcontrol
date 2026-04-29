@@ -6,7 +6,7 @@ import { toast } from "react-toastify";
 
 export default function Register() {
   const navigate = useNavigate();
-  const { login } = useAuth(); // ✅ MUST be inside component
+  const { login } = useAuth();
 
   const [form, setForm] = useState({
     name: "",
@@ -19,7 +19,9 @@ export default function Register() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
-  // 🔐 Password validation
+  // =========================
+  // 🔐 PASSWORD RULES
+  // =========================
   const validatePassword = (password) => ({
     minLength: password.length >= 6,
     hasUpper: /[A-Z]/.test(password),
@@ -28,7 +30,6 @@ export default function Register() {
     hasSymbol: /[!@#$%^&*(),.?":{}|<>]/.test(password),
   });
 
-  // 📊 Strength
   const getStrength = (password) => {
     const rules = validatePassword(password);
     return Object.values(rules).filter(Boolean).length;
@@ -36,18 +37,24 @@ export default function Register() {
 
   const strength = getStrength(form.password);
 
-  // 🔁 Handle input
+  // =========================
+  // 🔁 INPUT HANDLER
+  // =========================
   const handleChange = (e) => {
     setForm({ ...form, [e.target.name]: e.target.value });
     setError("");
   };
 
-  // 👁️ Toggle password
+  // =========================
+  // 👁️ TOGGLE PASSWORD
+  // =========================
   const togglePassword = () => {
     setShowPassword((prev) => !prev);
   };
 
-  // 🚀 Submit
+  // =========================
+  // 🚀 SUBMIT (CLEAN FLOW)
+  // =========================
   const handleSubmit = async (e) => {
     e.preventDefault();
 
@@ -60,9 +67,7 @@ export default function Register() {
       !rules.hasNumber ||
       !rules.hasSymbol
     ) {
-      setError(
-        "Password must be 6+ chars and include uppercase, lowercase, number & symbol"
-      );
+      setError("Password must be strong (6+ chars, upper, lower, number, symbol)");
       return;
     }
 
@@ -74,22 +79,35 @@ export default function Register() {
     try {
       setLoading(true);
 
+      // =========================
+      // 🔥 REGISTER
+      // =========================
       const res = await API.post("/auth/register", {
         name: form.name,
         email: form.email,
         password: form.password,
       });
 
-      // 🔥 Auto-login if backend returns token
-      if (res.data.token && res.data.user) {
-        login(res.data);
+      const { token, user } = res.data;
+
+      // =========================
+      // 🔐 AUTO LOGIN (ONLY TOKEN STORED)
+      // =========================
+      if (token) {
+        login({ token });
+
         toast.success("Account created successfully 🚀");
 
-        if (res.data.user.role === "admin") {
+        // =========================
+        // 🚦 ROUTING LOGIC (SIMPLE)
+        // =========================
+        if (user.role === "admin") {
           navigate("/admin");
         } else {
+          // 👉 let ProtectedDashboard decide setup vs dashboard
           navigate("/dashboard");
         }
+
       } else {
         toast.success("Registration successful! Please login.");
         navigate("/login");
@@ -112,7 +130,6 @@ export default function Register() {
       <h2>Register</h2>
 
       <form onSubmit={handleSubmit}>
-        {/* NAME */}
         <input
           name="name"
           placeholder="Name"
@@ -121,7 +138,6 @@ export default function Register() {
           required
         />
 
-        {/* EMAIL */}
         <input
           name="email"
           type="email"
@@ -131,7 +147,6 @@ export default function Register() {
           required
         />
 
-        {/* PASSWORD */}
         <div style={{ display: "flex", gap: "5px" }}>
           <input
             name="password"
@@ -147,7 +162,6 @@ export default function Register() {
           </button>
         </div>
 
-        {/* CONFIRM PASSWORD */}
         <input
           name="confirmPassword"
           type={showPassword ? "text" : "password"}
@@ -177,29 +191,15 @@ export default function Register() {
           </div>
         </div>
 
-        {/* ERROR */}
-        {error && (
-          <p style={{ color: "red", marginTop: "10px" }}>
-            {error}
-          </p>
-        )}
+        {error && <p style={{ color: "red" }}>{error}</p>}
 
-        {/* SUBMIT */}
-        <button
-          type="submit"
-          disabled={loading}
-          style={{ marginTop: "10px" }}
-        >
+        <button disabled={loading}>
           {loading ? "Creating account..." : "Register"}
         </button>
       </form>
 
-      {/* LOGIN LINK */}
-      <p style={{ marginTop: "10px" }}>
-        Already have an account?{" "}
-        <Link to="/login" style={{ color: "blue" }}>
-          Login
-        </Link>
+      <p>
+        Already have an account? <Link to="/login">Login</Link>
       </p>
     </div>
   );

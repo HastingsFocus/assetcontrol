@@ -15,7 +15,9 @@ export default function Login() {
 
   const [loading, setLoading] = useState(false);
 
-  // 🔄 Handle input
+  // =========================
+  // 🔄 INPUT HANDLER
+  // =========================
   const handleChange = (e) => {
     setForm({
       ...form,
@@ -23,37 +25,34 @@ export default function Login() {
     });
   };
 
-  // 🚀 Submit (NOW INSIDE COMPONENT)
+  // =========================
+  // 🚀 LOGIN (CLEAN VERSION)
+  // =========================
   const handleSubmit = async (e) => {
     e.preventDefault();
 
     try {
       setLoading(true);
 
-      // 🔐 LOGIN
+      // 🔐 LOGIN API
       const res = await API.post("/auth/login", form);
 
-      login(res.data);
+      const { token, user } = res.data;
 
-      const user = res.data.user;
-      console.log(user._id);
+      // 🔥 STORE ONLY TOKEN (AuthContext handles everything else)
+      login({ token });
 
       toast.success("Login successful 🚀");
 
-      // ✅ ADMIN FIRST (STOP HERE)
+      // =========================
+      // 🔥 ROUTING LOGIC (SIMPLIFIED)
+      // =========================
       if (user.role === "admin") {
         navigate("/admin");
         return;
       }
 
-      // 🔥 ONLY NORMAL USERS REACH HERE
-      const check = await API.get("/items/check-my-setup");
-
-      if (!check.data.isSetup) {
-        navigate("/setup-inventory");
-        return;
-      }
-
+      // 👉 LET ROUTE GUARD HANDLE SETUP LOGIC
       navigate("/dashboard");
 
     } catch (error) {
@@ -69,7 +68,7 @@ export default function Login() {
   };
 
   return (
-    <div style={{ maxWidth: "400px", margin: "auto" }}>
+    <div>
       <h2>Login</h2>
 
       <form onSubmit={handleSubmit}>
@@ -82,8 +81,6 @@ export default function Login() {
           required
         />
 
-        <br /><br />
-
         <input
           type="password"
           name="password"
@@ -93,18 +90,13 @@ export default function Login() {
           required
         />
 
-        <br /><br />
-
-        <button type="submit" disabled={loading}>
+        <button disabled={loading}>
           {loading ? "Logging in..." : "Login"}
         </button>
       </form>
 
-      <p style={{ marginTop: "15px" }}>
-        Don’t have an account?{" "}
-        <Link to="/register" style={{ color: "blue" }}>
-          Sign up
-        </Link>
+      <p>
+        Don't have an account? <Link to="/register">Register</Link>
       </p>
     </div>
   );

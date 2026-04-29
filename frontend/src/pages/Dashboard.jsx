@@ -4,40 +4,35 @@ import API from "../services/api";
 import RequisitionForm from "../components/RequisitionForm";
 import MyRequests from "../components/MyRequests";
 import socket from "../socket";
+import { useAuth } from "../context/AuthContext";
 
 export default function Dashboard() {
-  const [user, setUser] = useState(null);
+  const { user, loading } = useAuth(); 
   const navigate = useNavigate();
 
   const [active, setActive] = useState("requisition");
   const [notifications, setNotifications] = useState([]);
 
   // =========================
-  // 🔐 LOAD USER FROM BACKEND
+  // 🔥 LOAD NOTIFICATIONS (PERSISTED)
   // =========================
   useEffect(() => {
-    const load = async () => {
+    if (!user?._id) return;
+
+    const fetchNotifications = async () => {
       try {
-        const res = await API.get("/auth/me");
-        setUser(res.data.user);
+        const res = await API.get("/notifications");
+        setNotifications(res.data);
       } catch (err) {
-        console.log("Session expired");
-
-        localStorage.removeItem("token");
-        localStorage.removeItem("user");
-
-        navigate("/login");
+        console.log("❌ Failed to load notifications");
       }
     };
 
-    load();
-  }, []);
-
-
-  
+    fetchNotifications();
+  }, [user]);
 
   // =========================
-  // 🔥 SOCKET SETUP
+  // 🔥 SOCKET REAL-TIME UPDATES
   // =========================
   useEffect(() => {
     if (!user?._id) return;
@@ -45,8 +40,12 @@ export default function Dashboard() {
     socket.emit("register", user._id);
 
     const handleNotification = (data) => {
-      console.log("New notification:", data);
-      setNotifications((prev) => [data, ...prev]);
+      setNotifications((prev) => {
+        const exists = prev.some((n) => n._id === data._id);
+        if (exists) return prev;
+
+        return [data, ...prev];
+      });
     };
 
     socket.on("notification", handleNotification);
@@ -61,22 +60,24 @@ export default function Dashboard() {
   // =========================
   const handleLogout = () => {
     localStorage.removeItem("token");
-    localStorage.removeItem("user");
-
     socket.disconnect();
-
     navigate("/login");
   };
 
   // =========================
-  // ⏳ LOADING STATE
+  // ⏳ LOADING GUARD
   // =========================
-  if (!user) {
+  if (loading || !user) {
     return <p style={{ padding: 20 }}>Loading dashboard...</p>;
   }
 
   // =========================
-  // UI
+  // 🔥 UNREAD COUNT
+  // =========================
+  const unreadCount = notifications.filter((n) => !n.isRead).length;
+
+  // =========================
+  // 🎨 UI
   // =========================
   return (
     <div style={{ display: "flex", height: "100vh" }}>
@@ -94,15 +95,14 @@ export default function Dashboard() {
         }}
       >
 
-        {/* TOP */}
         <div>
-         <h3 style={{ marginBottom: "5px" }}>
-  👤 {user?.name || "Loading..."}
-</h3>
+          <h3 style={{ marginBottom: "5px" }}>
+            👤 {user?.name}
+          </h3>
 
-<p style={{ fontSize: "12px", opacity: 0.7 }}>
-  {user?.email}
-</p>
+          <p style={{ fontSize: "12px", opacity: 0.7 }}>
+            {user?.email}
+          </p>
 
           <hr />
 
@@ -115,12 +115,9 @@ export default function Dashboard() {
               📋 My Requests
             </button>
 
-            <button onClick={() => setActive("condition")}>
-              🧾 Provide Asset Condition
-            </button>
-
+            {/* 🔥 UNREAD BADGE */}
             <button onClick={() => setActive("notifications")}>
-              🔔 Notifications ({notifications.length})
+              🔔 Notifications ({unreadCount})
             </button>
 
             <button onClick={() => navigate("/edit-inventory")}>
@@ -152,10 +149,6 @@ export default function Dashboard() {
 
         {active === "myRequests" && <MyRequests />}
 
-        {active === "condition" && (
-          <h2>🧾 Asset Condition Page</h2>
-        )}
-
         {active === "notifications" && (
           <div>
             <h2>🔔 Notifications</h2>
@@ -163,17 +156,24 @@ export default function Dashboard() {
             {notifications.length === 0 ? (
               <p>No notifications yet</p>
             ) : (
-              notifications.map((n, i) => (
+              notifications.map((n) => (
                 <div
-                  key={i}
+                  key={n._id}
                   style={{
                     padding: "10px",
                     margin: "10px 0",
-                    border: "1px solid #ccc",
                     borderRadius: "6px",
+
+                    // 🔥 READ / UNREAD VISUAL
+                    background: n.isRead ? "#f3f4f6" : "#ffffff",
+                    borderLeft: n.isRead
+                      ? "4px solid #9ca3af"
+                      : "4px solid #2563eb",
+
+                    boxShadow: "0 1px 3px rgba(0,0,0,0.1)",
                   }}
                 >
-                  {n.message}
+                  <p style={{ margin: 0 }}>{n.message}</p>
                 </div>
               ))
             )}

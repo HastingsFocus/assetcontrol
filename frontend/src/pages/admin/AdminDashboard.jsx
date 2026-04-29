@@ -4,85 +4,96 @@ import AllRequests from "../../components/AllRequests";
 import InventoryOverview from "../../components/InventoryOverview";
 import socket from "../../socket";
 import API from "../../services/api";
+import useNotifications from "../../hooks/useNotifications";
+import { useAuth } from "../../context/AuthContext";
 
 export default function AdminDashboard() {
-  const [user, setUser] = useState(null);
+  const { user, loading } = useAuth(); // 🔥 FIXED (no duplicate fetch)
   const [active, setActive] = useState("assets");
-  const [notifications, setNotifications] = useState([]);
+
+  const { notifications, markAsRead } = useNotifications();
 
   const navigate = useNavigate();
   const location = useLocation();
 
   // =========================
-  // 🔐 LOAD REAL USER (SAFE)
+  // 🔥 AUTO SWITCH TAB FROM URL
   // =========================
   useEffect(() => {
-    const loadUser = async () => {
-      try {
-        const res = await API.get("/auth/me");
-        setUser(res.data.user);
-      } catch (err) {
-        console.log("Session expired");
+    const params = new URLSearchParams(location.search);
+    const requestId = params.get("requestId");
 
-        localStorage.removeItem("token");
-        localStorage.removeItem("user");
-
-        navigate("/login");
-      }
-    };
-
-    loadUser();
-  }, [navigate]);
-
-  // =========================
-  // 🔥 SOCKET CONNECTION (SAFE)
-  // =========================
-  useEffect(() => {
-    if (!user?._id) return;
-
-    socket.emit("register", user._id);
-
-    const handleNotification = (data) => {
-      setNotifications((prev) => [data, ...prev]);
-    };
-
-    socket.on("notification", handleNotification);
-
-    return () => {
-      socket.off("notification", handleNotification);
-    };
-  }, [user]);
+    if (requestId) {
+      setActive("requests");
+    }
+  }, [location.search]);
 
   // =========================
   // 🚪 LOGOUT
   // =========================
   const handleLogout = () => {
-    localStorage.removeItem("token");
-    localStorage.removeItem("user");
-
+    localStorage.clear();
     socket.disconnect();
-
     navigate("/login");
   };
 
   // =========================
-  // 🔔 VIEW REQUEST FROM NOTIFICATION
+  // 🔔 VIEW REQUEST
   // =========================
   const handleViewRequest = (requestId) => {
     if (!requestId) return;
 
     setActive("requests");
-    navigate(`/admin?requestId=${requestId}`);
+
+    navigate({
+      pathname: "/admin",
+      search: `?requestId=${requestId}`,
+    });
   };
 
   // =========================
-  // 🔄 LOADING STATE
+  // ⏳ LOADING GUARD
   // =========================
-  if (!user) {
+  if (loading || !user) {
     return <p style={{ padding: 20 }}>Loading admin dashboard...</p>;
   }
 
-  const highlightId = new URLSearchParams(location.search).get("requestId");
+  // =========================
+  // 🔥 UNREAD COUNT
+  // =========================
+  const unreadCount = notifications.filter((n) => !n.isRead).length;
+
+  // =========================
+  // 🕒 FORMAT TIME
+  // =========================
+  const formatNotificationTime = (date) => {
+    const now = new Date();
+    const created = new Date(date);
+
+    const isToday = created.toDateString() === now.toDateString();
+
+    const yesterday = new Date();
+    yesterday.setDate(now.getDate() - 1);
+
+    const isYesterday = created.toDateString() === yesterday.toDateString();
+
+    if (isToday) {
+      return created.toLocaleTimeString([], {
+        hour: "2-digit",
+        minute: "2-digit",
+      });
+    }
+
+    if (isYesterday) {
+      return "Yesterday";
+    }
+
+    return created.toLocaleDateString([], {
+      day: "numeric",
+      month: "short",
+      year: "numeric",
+    });
+  };
 
   // =========================
   // UI
@@ -102,20 +113,14 @@ export default function AdminDashboard() {
           justifyContent: "space-between",
         }}
       >
-
-        {/* TOP */}
         <div>
-          <h3 style={{ marginBottom: "5px" }}>
-  👤 {user?.name || "Admin"}
-</h3>
-
-<p style={{ fontSize: "12px", opacity: 0.7 }}>
-  {user?.email}
-</p>
-
-<p style={{ fontSize: "12px", color: "#9ca3af" }}>
-  {user?.role?.toUpperCase()}
-</p>
+          <h3>👤 {user.name}</h3>
+          <p style={{ fontSize: "12px", opacity: 0.7 }}>
+            {user.email}
+          </p>
+          <p style={{ fontSize: "12px", color: "#9ca3af" }}>
+            {user.role?.toUpperCase()}
+          </p>
 
           <hr />
 
@@ -128,12 +133,8 @@ export default function AdminDashboard() {
               📦 All Requests
             </button>
 
-            <button onClick={() => setActive("reports")}>
-              📈 Condition Reports
-            </button>
-
             <button onClick={() => setActive("notifications")}>
-              🔔 Notifications ({notifications.length})
+              🔔 Notifications ({unreadCount})
             </button>
           </div>
         </div>
@@ -159,11 +160,7 @@ export default function AdminDashboard() {
         {active === "assets" && <InventoryOverview />}
 
         {active === "requests" && (
-          <AllRequests highlightId={highlightId} />
-        )}
-
-        {active === "reports" && (
-          <h2>📈 Condition Reports (Coming Soon)</h2>
+          <AllRequests highlightId={new URLSearchParams(location.search).get("requestId")} />
         )}
 
         {active === "notifications" && (
@@ -173,30 +170,53 @@ export default function AdminDashboard() {
             {notifications.length === 0 ? (
               <p>No notifications yet</p>
             ) : (
-              notifications.map((n, i) => (
+              notifications.map((n) => (
                 <div
-                  key={i}
+                  key={n._id}
                   style={{
                     padding: "12px",
                     marginBottom: "10px",
-                    borderRadius: "8px",
-                    background: "#f3f4f6",
-                    display: "flex",
-                    justifyContent: "space-between",
-                    alignItems: "center",
+                    borderRadius: "10px",
+                    background: n.isRead ? "#f9fafb" : "#ffffff",
+                    borderLeft: n.isRead
+                      ? "4px solid #d1d5db"
+                      : "4px solid #2563eb",
+                    boxShadow: "0 2px 6px rgba(0,0,0,0.08)",
                   }}
                 >
-                  <span>{n.message}</span>
+                  {/* HEADER */}
+                  <div
+                    style={{
+                      display: "flex",
+                      justifyContent: "space-between",
+                      marginBottom: "6px",
+                    }}
+                  >
+                    <strong>{n.department || "System"}</strong>
 
+                    <span style={{ fontSize: "12px", color: "#6b7280" }}>
+                      {formatNotificationTime(n.createdAt)}
+                    </span>
+                  </div>
+
+                  {/* MESSAGE */}
+                  <p style={{ margin: 0 }}>{n.message}</p>
+
+                  {/* ACTION */}
                   {n.request && (
                     <button
-                      onClick={() => handleViewRequest(n.request)}
+                      onClick={() => {
+                        markAsRead(n._id);
+                        handleViewRequest(n.request);
+                      }}
                       style={{
+                        marginTop: "8px",
+                        padding: "6px 10px",
                         background: "#2563eb",
                         color: "white",
                         border: "none",
-                        padding: "5px 10px",
                         borderRadius: "5px",
+                        cursor: "pointer",
                       }}
                     >
                       View

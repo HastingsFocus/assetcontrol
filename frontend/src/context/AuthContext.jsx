@@ -1,49 +1,86 @@
 import { createContext, useContext, useEffect, useState } from "react";
+import API from "../services/api";
 
-// Create context
 const AuthContext = createContext();
 
-// Custom hook
-export const useAuth = () => {
-  return useContext(AuthContext);
-};
+export const useAuth = () => useContext(AuthContext);
 
-// Provider
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
-  const [token, setToken] = useState(null);
+  const [token, setToken] = useState(localStorage.getItem("token"));
+  const [loading, setLoading] = useState(true);
 
-  // 🔥 Load from localStorage on app start
-  useEffect(() => {
-    const storedUser = localStorage.getItem("user");
-    const storedToken = localStorage.getItem("token");
+  // =========================
+  // 🔥 LOAD FRESH USER FROM BACKEND
+  // =========================
+  const loadUser = async () => {
+    try {
+      const res = await API.get("/auth/me");
+      setUser(res.data.user);
+    } catch (err) {
+      console.log("❌ Auth load failed");
 
-    if (storedUser && storedToken) {
-      setUser(JSON.parse(storedUser));
-      setToken(storedToken);
+      setUser(null);
+      setToken(null);
+
+      localStorage.removeItem("token");
+      localStorage.removeItem("user");
+    } finally {
+      setLoading(false);
     }
-  }, []);
-
-  // 🔥 Login function
-  const login = (data) => {
-    setUser(data.user);
-    setToken(data.token);
-
-    localStorage.setItem("user", JSON.stringify(data.user));
-    localStorage.setItem("token", data.token);
   };
 
-  // 🔥 Logout function
+  // =========================
+  // 🚀 INITIAL AUTH CHECK
+  // =========================
+  useEffect(() => {
+    if (token) {
+      loadUser();
+    } else {
+      setLoading(false);
+    }
+  }, [token]);
+
+  // =========================
+  // 🔐 LOGIN (STORE TOKEN ONLY)
+  // =========================
+  const login = (data) => {
+    setToken(data.token);
+    localStorage.setItem("token", data.token);
+
+    // 🔥 DO NOT TRUST USER FROM LOGIN RESPONSE LONG-TERM
+    loadUser(); // immediately sync fresh data
+  };
+
+  // =========================
+  // 🚪 LOGOUT
+  // =========================
   const logout = () => {
     setUser(null);
     setToken(null);
 
-    localStorage.removeItem("user");
     localStorage.removeItem("token");
+    localStorage.removeItem("user");
+  };
+
+  // =========================
+  // 🔄 MANUAL REFRESH USER (OPTIONAL BUT POWERFUL)
+  // =========================
+  const refreshUser = () => {
+    if (token) loadUser();
   };
 
   return (
-    <AuthContext.Provider value={{ user, token, login, logout }}>
+    <AuthContext.Provider
+      value={{
+        user,
+        token,
+        loading,
+        login,
+        logout,
+        refreshUser,
+      }}
+    >
       {children}
     </AuthContext.Provider>
   );

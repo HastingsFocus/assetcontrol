@@ -1,10 +1,36 @@
 import { useEffect, useState } from "react";
 import API from "../services/api";
 import socket from "../socket";
+import { useAuth } from "../context/AuthContext";
 
 export default function EditInventory() {
+  const { user, loading: authLoading } = useAuth(); // 🔥 IMPORTANT FIX
+
   const [items, setItems] = useState([]);
   const [itemTypes, setItemTypes] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  // =========================
+  // 🔐 GUARD: WAIT FOR AUTH
+  // =========================
+  useEffect(() => {
+    if (authLoading) return;
+    if (!user) return;
+
+    fetchInventory();
+    fetchTypes();
+
+    const handleUpdate = () => {
+      console.log("🔄 Inventory update received");
+      fetchInventory();
+    };
+
+    socket.on("inventoryUpdated", handleUpdate);
+
+    return () => {
+      socket.off("inventoryUpdated", handleUpdate);
+    };
+  }, [authLoading, user]);
 
   // =========================
   // 📦 FETCH INVENTORY
@@ -15,6 +41,8 @@ export default function EditInventory() {
       setItems(res.data);
     } catch (err) {
       console.log("Error loading inventory", err);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -29,25 +57,6 @@ export default function EditInventory() {
       console.log(err);
     }
   };
-
-  // =========================
-  // 🔄 INIT + SOCKET
-  // =========================
-  useEffect(() => {
-    fetchInventory();
-    fetchTypes();
-
-    const handleUpdate = () => {
-      console.log("🔄 Inventory update received (user)");
-      fetchInventory();
-    };
-
-    socket.on("inventoryUpdated", handleUpdate);
-
-    return () => {
-      socket.off("inventoryUpdated", handleUpdate);
-    };
-  }, []);
 
   // =========================
   // ➕ ADD ITEM
@@ -90,34 +99,35 @@ export default function EditInventory() {
     });
   };
 
-  
+  // =========================
+  // 💾 SAVE / UPDATE
+  // =========================
   const handleUpdate = async (item) => {
-  try {
-    // 🆕 CREATE NEW ITEM
-    if (!item._id) {
-      await API.post("/items/my-item", {
-        itemType: item.itemType,
+    try {
+      // 🆕 CREATE
+      if (!item._id) {
+        await API.post("/items/my-item", {
+          itemType: item.itemType,
+          conditions: item.conditions,
+        });
+
+        fetchInventory();
+        return;
+      }
+
+      // ✏️ UPDATE
+      await API.put(`/items/my-item/${item._id}`, {
+        itemType: item.itemType?._id || item.itemType,
         conditions: item.conditions,
       });
 
-      alert("Item created successfully");
       fetchInventory();
-      return;
+    } catch (err) {
+      console.log(err);
+      alert("Save failed");
     }
+  };
 
-    // ✏️ UPDATE EXISTING ITEM
-    await API.put(`/items/my-item/${item._id}`, {
-      itemType: item.itemType?._id || item.itemType,
-      conditions: item.conditions,
-    });
-
-    alert("Item updated successfully");
-    fetchInventory();
-  } catch (err) {
-    console.log(err);
-    alert("Save failed");
-  }
-};
   // =========================
   // 🗑️ DELETE
   // =========================
@@ -132,7 +142,14 @@ export default function EditInventory() {
   };
 
   // =========================
-  // UI
+  // ⏳ LOADING GUARD
+  // =========================
+  if (authLoading || loading) {
+    return <p style={{ padding: 20 }}>Loading inventory...</p>;
+  }
+
+  // =========================
+  // 🎨 UI
   // =========================
   return (
     <div style={{ padding: "20px" }}>
@@ -201,7 +218,6 @@ export default function EditInventory() {
 
             <br />
 
-            {/* TOTAL */}
             <strong>
               Total:{" "}
               {(item.conditions?.good || 0) +
@@ -211,7 +227,6 @@ export default function EditInventory() {
 
             <br /><br />
 
-            {/* ACTIONS */}
             <button onClick={() => handleUpdate(item)}>
               💾 Save
             </button>

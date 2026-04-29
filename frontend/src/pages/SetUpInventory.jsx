@@ -5,7 +5,7 @@ import { useAuth } from "../context/AuthContext";
 import { toast } from "react-toastify";
 
 export default function SetupInventory() {
-  const { user } = useAuth(); // 🔥 use context
+  const { user, loading: authLoading } = useAuth(); // 🔥 IMPORTANT FIX
   const navigate = useNavigate();
 
   const [itemTypes, setItemTypes] = useState([]);
@@ -21,12 +21,18 @@ export default function SetupInventory() {
   const [saving, setSaving] = useState(false);
 
   // =========================
-  // 🔥 LOAD DATA
+  // 🔥 WAIT FOR AUTH FIRST (CRITICAL FIX)
   // =========================
   useEffect(() => {
+    if (authLoading) return;
+    if (!user) {
+      navigate("/login");
+      return;
+    }
+
     fetchTypes();
     loadExistingInventory();
-  }, []);
+  }, [authLoading, user]);
 
   // =========================
   // 🔥 FETCH ITEM TYPES
@@ -42,7 +48,7 @@ export default function SetupInventory() {
   };
 
   // =========================
-  // 🔥 LOAD EXISTING INVENTORY
+  // 🔥 LOAD INVENTORY
   // =========================
   const loadExistingInventory = async () => {
     try {
@@ -146,7 +152,6 @@ export default function SetupInventory() {
       const newItems = items.filter((i) => !i._id);
       const existingItems = items.filter((i) => i._id);
 
-      // 🔄 UPDATE EXISTING
       await Promise.all(
         existingItems.map((item) =>
           API.put(`/items/my-item/${item._id}`, {
@@ -156,7 +161,6 @@ export default function SetupInventory() {
         )
       );
 
-      // ➕ CREATE NEW (BATCH)
       if (newItems.length > 0) {
         await API.post("/items/setup", {
           items: newItems.map((item) => ({
@@ -166,17 +170,12 @@ export default function SetupInventory() {
         });
       }
 
-      // ✅ MARK SETUP COMPLETE
       await API.put("/settings/setup-complete");
 
       toast.success("Inventory setup completed successfully 🚀");
 
-      // 🚀 REDIRECT
-      if (user?.role === "admin") {
-        navigate("/admin");
-      } else {
-        navigate("/dashboard");
-      }
+      // 🔥 SAFE NAVIGATION
+      navigate("/dashboard", { replace: true });
 
     } catch (error) {
       console.log(error);
@@ -189,9 +188,9 @@ export default function SetupInventory() {
   };
 
   // =========================
-  // ⏳ LOADING UI
+  // ⏳ LOADING UI (AUTH SAFE)
   // =========================
-  if (loading) {
+  if (authLoading || loading) {
     return <p style={{ textAlign: "center" }}>Loading inventory...</p>;
   }
 
@@ -214,7 +213,6 @@ export default function SetupInventory() {
             borderRadius: 5,
           }}
         >
-          {/* ITEM TYPE */}
           <select
             value={item.itemType}
             onChange={(e) =>
@@ -238,7 +236,6 @@ export default function SetupInventory() {
 
           <br /><br />
 
-          {/* CONDITIONS */}
           <div>
             <label>Good: </label>
             <input
@@ -269,8 +266,6 @@ export default function SetupInventory() {
           </div>
 
           <br />
-
-          {/* TOTAL */}
           <strong>Total: {getTotal(item.conditions)}</strong>
         </div>
       ))}
@@ -285,18 +280,6 @@ export default function SetupInventory() {
       >
         {saving ? "Saving..." : "💾 Save Inventory"}
       </button>
-
-      {hasDuplicate && (
-        <p style={{ color: "red" }}>
-          Duplicate items not allowed
-        </p>
-      )}
-
-      {hasInvalid && (
-        <p style={{ color: "red" }}>
-          Each item must have at least 1 quantity
-        </p>
-      )}
     </div>
   );
 }

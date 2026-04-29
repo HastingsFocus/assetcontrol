@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import API from "../services/api";
 import socket from "../socket";
 
@@ -7,22 +7,21 @@ export default function InventoryOverview() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
-  // 🔥 FETCH INVENTORY
-  const fetchInventory = async () => {
+  // =========================
+  // 📦 FETCH INVENTORY (STABLE)
+  // =========================
+  const fetchInventory = useCallback(async () => {
     try {
       setLoading(true);
 
-      const token = localStorage.getItem("token");
-      console.log("🔐 TOKEN:", token);
-
       const res = await API.get("/items/all");
 
-      setData(res.data);
+      setData(res.data || []);
       setError("");
-    } catch (error) {
-      console.error("❌ Failed to fetch inventory", error);
+    } catch (err) {
+      console.error("❌ Failed to fetch inventory", err);
 
-      if (error.response?.status === 403) {
+      if (err.response?.status === 403) {
         setError("Access denied. Please login again as admin.");
       } else {
         setError("Failed to load inventory");
@@ -30,34 +29,44 @@ export default function InventoryOverview() {
     } finally {
       setLoading(false);
     }
-  };
-
-  // 🔥 ONE CLEAN useEffect
-  useEffect(() => {
-    fetchInventory();
-
-    socket.on("inventoryUpdated", () => {
-      console.log("🔄 Inventory update received (admin)");
-      fetchInventory();
-    });
-
-    return () => {
-      socket.off("inventoryUpdated");
-    };
   }, []);
 
-  // 🔥 GROUP BY DEPARTMENT
+  // =========================
+  // 🔄 INIT + SOCKET
+  // =========================
+  useEffect(() => {
+    let isMounted = true;
+
+    fetchInventory();
+
+    const handleUpdate = () => {
+      console.log("🔄 Inventory update received (admin)");
+      if (isMounted) fetchInventory();
+    };
+
+    socket.on("inventoryUpdated", handleUpdate);
+
+    return () => {
+      isMounted = false;
+      socket.off("inventoryUpdated", handleUpdate);
+    };
+  }, [fetchInventory]);
+
+  // =========================
+  // 🧠 GROUP BY DEPARTMENT
+  // =========================
   const grouped = data.reduce((acc, item) => {
     const dept = item.department || "Unknown";
 
-    if (!acc[dept]) {
-      acc[dept] = [];
-    }
-
+    if (!acc[dept]) acc[dept] = [];
     acc[dept].push(item);
+
     return acc;
   }, {});
 
+  // =========================
+  // UI
+  // =========================
   return (
     <div>
       <h2>🏢 Department Inventory Overview</h2>
@@ -76,7 +85,7 @@ export default function InventoryOverview() {
 
       {!loading &&
         !error &&
-        Object.keys(grouped).map((dept) => (
+        Object.entries(grouped).map(([dept, items]) => (
           <div
             key={dept}
             style={{
@@ -88,7 +97,7 @@ export default function InventoryOverview() {
           >
             <h3>📌 {dept}</h3>
 
-            {grouped[dept].map((item) => (
+            {items.map((item) => (
               <div
                 key={item._id}
                 style={{
@@ -98,7 +107,9 @@ export default function InventoryOverview() {
                   borderRadius: "6px",
                 }}
               >
-                <strong>{item.itemType?.name || "Unknown Item"}</strong>
+                <strong>
+                  {item.itemType?.name || "Unknown Item"}
+                </strong>
 
                 <div style={{ marginTop: "5px" }}>
                   ✅ Good: {item.conditions?.good || 0} |{" "}

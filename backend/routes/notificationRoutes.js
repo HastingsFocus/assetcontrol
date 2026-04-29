@@ -12,6 +12,5 @@ const router = express.Router();
 router.get("/", protect, getNotifications);
 
 // ✔ Mark single notification as read
-router.put("/:id", protect, markAsRead);
-
+router.put("/:id/read", protect, markAsRead);
 export default router;

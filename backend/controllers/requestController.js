@@ -12,12 +12,24 @@ export const createRequest = async (req, res) => {
   try {
     const { itemType, requiredDate, quantity, priority } = req.body;
 
+    // =========================
+    // 🔐 VALIDATION
+    // =========================
     if (!itemType || !requiredDate || !quantity || !priority) {
       return res.status(400).json({
         message: "All fields are required",
       });
     }
 
+    if (quantity <= 0) {
+      return res.status(400).json({
+        message: "Quantity must be greater than 0",
+      });
+    }
+
+    // =========================
+    // 🔍 CHECK ITEM TYPE
+    // =========================
     const type = await ItemType.findById(itemType);
 
     if (!type) {
@@ -32,6 +44,9 @@ export const createRequest = async (req, res) => {
       });
     }
 
+    // =========================
+    // 📦 CREATE REQUEST
+    // =========================
     const request = await Request.create({
       user: req.user._id,
       itemType,
@@ -42,38 +57,56 @@ export const createRequest = async (req, res) => {
       status: "pending",
       department: req.user.department,
     });
+// =========================
+// 🔔 NOTIFY ADMINS (CLEAN VERSION)
+// =========================
+const admins = await User.find({ role: "admin" }).select("_id");
 
-    // 🔥 FIND ADMINS
-    const admins = await User.find({ role: "admin" });
+const notificationsToInsert = admins.map((admin) => ({
+  user: admin._id,
+  message: `New request for ${type.name}`,
+  type: "request_created",
+  request: request._id,
+  department: request.department,
+  isRead: false,
+}));
 
-    // 🔥 NOTIFY ADMINS
-    for (const admin of admins) {
-      await Notification.create({
-        user: admin._id,
-        message: `New request for ${type.name}`,
-        type: "request_created",
-        request: request._id,
-      });
+// 🔥 SAVE
+const savedNotifications = await Notification.insertMany(notificationsToInsert);
 
-      sendNotification(admin._id, {
-        message: `New request for ${type.name}`,
-        type: "request_created",
-        request: request._id,
-      });
-    }
+// =========================
+// ⚡ REAL-TIME SOCKET (FIXED)
+// =========================
+savedNotifications.forEach((notification) => {
+  sendNotification(notification.user.toString(), {
+    _id: notification._id,
+    user: notification.user,
+    message: notification.message,
+    type: notification.type,
+    request: notification.request,
+    department: notification.department,
+    isRead: false,
+    createdAt: notification.createdAt,
+  });
+});
+    
 
+    // =========================
+    // ✅ RESPONSE
+    // =========================
     res.status(201).json({
       message: "Request submitted successfully",
       request,
     });
 
   } catch (error) {
+    console.error("❌ createRequest error:", error);
+
     res.status(500).json({
       message: error.message || "Server error",
     });
   }
 };
-
 // ===============================
 // ✅ GET MY REQUESTS
 // ===============================

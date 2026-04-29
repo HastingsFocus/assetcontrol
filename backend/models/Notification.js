@@ -25,12 +25,16 @@ const notificationSchema = new mongoose.Schema(
       ref: "Request",
       required: false, // optional but useful
     },
+    department: {
+      type: String,
+    },
 
     // 🔴 FOR UNREAD COUNT
     isRead: {
       type: Boolean,
       default: false,
     },
+
   },
   {
     timestamps: true, // createdAt, updatedAt

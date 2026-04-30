@@ -3,29 +3,25 @@ import http from "http";
 
 let io;
 
-// 🔥 INIT SOCKET SERVER
 export const initSocket = (app) => {
   const server = http.createServer(app);
 
   io = new Server(server, {
     cors: {
-      origin: [
-        "http://localhost:5173", // ✅ dev
-        "https://assetcontrol-xilu.onrender.com", 
-      ],
+      origin: "*", // ✅ TEMP FIX (we tighten later)
+      methods: ["GET", "POST"],
       credentials: true,
     },
+    transports: ["websocket"], // ✅ VERY IMPORTANT
   });
 
   io.on("connection", (socket) => {
     console.log("🟢 New client connected:", socket.id);
 
-    // 🔥 REGISTER USER ROOM
     socket.on("register", (userId) => {
       if (!userId) return;
 
       const id = userId.toString();
-
       socket.join(id);
 
       console.log("👤 User joined room:", id);
@@ -39,22 +35,12 @@ export const initSocket = (app) => {
   return server;
 };
 
-//
-// 🔔 SEND NOTIFICATION
-//
 export const sendNotification = (userId, data) => {
   if (!io) return;
 
-  const id = userId.toString();
-
-  console.log("📡 Sending notification to room:", id);
-
-  io.to(id).emit("notification", data);
+  io.to(userId.toString()).emit("notification", data);
 };
 
-//
-// 📡 INVENTORY BROADCAST
-//
 export const broadcastInventoryUpdate = (data) => {
   if (!io) return;
 

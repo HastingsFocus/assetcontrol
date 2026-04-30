@@ -17,11 +17,12 @@ dotenv.config();
 const app = express();
 
 // =========================
-// 🔐 CORS CONFIG (ENV READY)
+// 🔐 CORS CONFIG (FIXED)
 // =========================
 app.use(
   cors({
-    origin: process.env.CLIENT_URL || "http://localhost:5173",
+    origin: "*", // ✅ allows all origins (fixes Render + sockets)
+    methods: ["GET", "POST", "PUT", "DELETE"],
     credentials: true,
   })
 );
@@ -60,7 +61,6 @@ const startServer = async () => {
     await connectDB();
     console.log("✅ Database connected");
 
-    // 🔥 RUN SEED ONLY IN SAFE MODE
     if (process.env.SEED_DB === "true") {
       console.log("🌱 Seeding item types...");
       await seedItemTypes();
@@ -75,7 +75,7 @@ const startServer = async () => {
 
   } catch (error) {
     console.error("❌ Failed to start server:", error);
-    process.exit(1); // 🔥 fail fast (important in production)
+    process.exit(1);
   }
 };
 

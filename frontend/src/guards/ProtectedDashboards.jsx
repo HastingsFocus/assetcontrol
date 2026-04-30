@@ -6,8 +6,7 @@ export default function ProtectedDashboard({ children }) {
   const { user, token, loading } = useAuth();
   const location = useLocation();
 
-  const { checking, isSetup } = useSetupCheck(user);
-
+ const { checking, isSetup } = useSetupCheck();
   // ⏳ WAIT FOR AUTH FIRST
   if (loading) {
     return <p>Loading session...</p>;

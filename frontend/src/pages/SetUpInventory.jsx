@@ -138,63 +138,79 @@ export default function SetupInventory() {
   // 🚀 SUBMIT
   // =========================
   const submit = async () => {
-    if (hasDuplicate) {
-      toast.error("Duplicate items not allowed");
-      return;
+  if (hasDuplicate) {
+    toast.error("Duplicate items not allowed");
+    return;
+  }
+
+  if (hasInvalid) {
+    toast.error("Each item must have at least 1 quantity");
+    return;
+  }
+
+  try {
+    setSaving(true);
+
+    const newItems = items.filter((i) => !i._id);
+    const existingItems = items.filter((i) => i._id);
+
+    // =========================
+    // 🔄 UPDATE EXISTING ITEMS
+    // =========================
+    await Promise.all(
+      existingItems.map((item) =>
+        API.put(`/items/my-item/${item._id}`, {
+          itemType: item.itemType,
+          conditions: item.conditions,
+        })
+      )
+    );
+
+    // =========================
+    // ➕ CREATE NEW ITEMS
+    // =========================
+    if (newItems.length > 0) {
+      await API.post("/items/setup", {
+        items: newItems.map((item) => ({
+          itemType: item.itemType,
+          conditions: item.conditions,
+        })),
+      });
     }
 
-    if (hasInvalid) {
-      toast.error("Each item must have at least 1 quantity");
-      return;
-    }
+    // =========================
+    // 🔥 MARK SETUP COMPLETE (BACKEND)
+    // =========================
+    await API.put("/settings/setup-complete");
 
-    try {
-      setSaving(true);
+    // =========================
+    // 🔥 TEMPORARY LOCAL FIX (IMPORTANT)
+    // =========================
+    const updatedUser = {
+      ...user,
+      inventorySetupComplete: true,
+    };
 
-      const newItems = items.filter((i) => !i._id);
-      const existingItems = items.filter((i) => i._id);
-
-      // 🔄 update existing
-      await Promise.all(
-        existingItems.map((item) =>
-          API.put(`/items/my-item/${item._id}`, {
-            itemType: item.itemType,
-            conditions: item.conditions,
-          })
-        )
-      );
-
-      // ➕ create new
-      if (newItems.length > 0) {
-        await API.post("/items/setup", {
-          items: newItems.map((item) => ({
-            itemType: item.itemType,
-            conditions: item.conditions,
-          })),
-        });
-      }
-
-      // 🔥 MARK SETUP COMPLETE
-      await API.put("/settings/setup-complete");
-
-      // 🔥 REFRESH USER STATE
+    // ⚠️ IMPORTANT:
+    // Only works if your AuthContext supports updating user
+    if (typeof refreshUser === "function") {
       await refreshUser();
-
-      toast.success("Inventory setup completed successfully 🚀");
-
-      // 🔥 NAVIGATE
-      navigate("/dashboard", { replace: true });
-
-    } catch (error) {
-      console.log(error);
-      toast.error(
-        error.response?.data?.message || "Failed to save inventory"
-      );
-    } finally {
-      setSaving(false);
     }
-  };
 
+    // =========================
+    // 🚀 NAVIGATE TO DASHBOARD
+    // =========================
+    navigate("/dashboard", { replace: true });
+
+  } catch (error) {
+    console.log(error);
+    toast.error(
+      error.response?.data?.message || "Failed to save inventory"
+    );
+  } finally {
+    setSaving(false);
+  }
+};
   // =========================
   // ⏳ LOADING
   // =========================

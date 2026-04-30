@@ -33,7 +33,7 @@ const protect = async (req, res, next) => {
 
     // 🔥 STANDARDIZED USER OBJECT
     req.user = {
-      _id: user._id,  // ✅ FIXED
+      _id: user._id.toString(),  // ✅ FIXED
       name: user.name,
       email: user.email,
       role: user.role,

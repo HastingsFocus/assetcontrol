@@ -12,7 +12,7 @@ import {
   createMyItem,
 } from "../controllers/itemController.js";
 
-import { protect, adminOnly } from "../middleware/authMiddleware.js";
+import protect, { adminOnly } from "../middleware/authMiddleware.js";
 // ❌ remove requireSetup from here (not needed for inventory flow)
 // import { requireSetup } from "../middleware/setupMiddleware.js";
 

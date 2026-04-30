@@ -4,8 +4,7 @@ import {
   markAsRead,
 } from "../controllers/notificationController.js";
 
-import { protect } from "../middleware/authMiddleware.js";
-
+import protect, { adminOnly } from "../middleware/authMiddleware.js";
 const router = express.Router();
 
 // 🔔 Get all notifications

@@ -2,7 +2,7 @@ import jwt from "jsonwebtoken";
 import User from "../models/User.js";
 
 // 🔒 PROTECT ROUTES (AUTH CHECK)
-export const protect = async (req, res, next) => {
+const protect = async (req, res, next) => {
   let token;
 
   // =========================
@@ -43,6 +43,7 @@ export const protect = async (req, res, next) => {
     // 🔥 STANDARDIZED USER OBJECT
     // =========================
     req.user = {
+      id: user._id.toString(), // ✅ IMPORTANT FIX
       _id: user._id,
       name: user.name,
       email: user.email,
@@ -60,7 +61,7 @@ export const protect = async (req, res, next) => {
 };
 
 // 🛡️ ADMIN ONLY MIDDLEWARE
-export const adminOnly = (req, res, next) => {
+const adminOnly = (req, res, next) => {
   if (!req.user) {
     return res.status(401).json({ message: "Not authorized" });
   }
@@ -71,3 +72,7 @@ export const adminOnly = (req, res, next) => {
 
   next();
 };
+
+// ✅ EXPORTS (FIXED)
+export default protect;
+export { adminOnly };

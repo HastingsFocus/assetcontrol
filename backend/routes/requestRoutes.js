@@ -6,8 +6,7 @@ import {
   updateRequestStatus,
 } from "../controllers/requestController.js";
 
-import { protect, adminOnly } from "../middleware/authMiddleware.js";
-
+import protect, { adminOnly } from "../middleware/authMiddleware.js";
 const router = express.Router();
 
 // HOD creates request

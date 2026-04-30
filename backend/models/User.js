@@ -24,6 +24,10 @@ const userSchema = new mongoose.Schema(
     department: { 
       type: String 
     },
+    inventorySetupComplete: {
+  type: Boolean,
+  default: false,
+},
   },
   { timestamps: true }
 );

@@ -1,39 +1,23 @@
-import Settings from "../models/Settings.js";
+import User from "../models/User.js";
 
-// GET /api/settings/check-setup
-export const checkSetup = async (req, res) => {
+export const completeSetup = async (req, res) => {
   try {
-    let settings = await Settings.findOne();
+    const user = await User.findById(req.user.id);
 
-    // If no settings exist → create default
-    if (!settings) {
-      settings = await Settings.create({});
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
     }
 
+    user.inventorySetupComplete = true;
+    await user.save();
+
     res.json({
-      isSetup: settings.isInventorySetup,
+      message: "Setup completed",
+      user,
     });
 
   } catch (error) {
-    res.status(500).json({ message: "Server error" });
-  }
-};
-
-// PUT /api/settings/setup-complete
-export const completeSetup = async (req, res) => {
-  try {
-    let settings = await Settings.findOne();
-
-    if (!settings) {
-      settings = await Settings.create({ isInventorySetup: true });
-    } else {
-      settings.isInventorySetup = true;
-      await settings.save();
-    }
-
-    res.json({ message: "Setup completed" });
-
-  } catch (error) {
+    console.error(error);
     res.status(500).json({ message: "Server error" });
   }
 };

@@ -5,7 +5,8 @@ import { useAuth } from "../context/AuthContext";
 import { toast } from "react-toastify";
 
 export default function SetupInventory() {
-  const { user, loading: authLoading } = useAuth(); // 🔥 IMPORTANT FIX
+  // ✅ ONLY ONE CALL
+  const { user, loading: authLoading, refreshUser } = useAuth();
   const navigate = useNavigate();
 
   const [itemTypes, setItemTypes] = useState([]);
@@ -21,10 +22,11 @@ export default function SetupInventory() {
   const [saving, setSaving] = useState(false);
 
   // =========================
-  // 🔥 WAIT FOR AUTH FIRST (CRITICAL FIX)
+  // 🔥 WAIT FOR AUTH FIRST
   // =========================
   useEffect(() => {
     if (authLoading) return;
+
     if (!user) {
       navigate("/login");
       return;
@@ -132,68 +134,69 @@ export default function SetupInventory() {
     return getTotal(item.conditions) === 0;
   });
 
-  const { user, loading: authLoading, refreshUser } = useAuth();
-
-const submit = async () => {
-  if (hasDuplicate) {
-    toast.error("Duplicate items not allowed");
-    return;
-  }
-
-  if (hasInvalid) {
-    toast.error("Each item must have at least 1 quantity");
-    return;
-  }
-
-  try {
-    setSaving(true);
-
-    const newItems = items.filter((i) => !i._id);
-    const existingItems = items.filter((i) => i._id);
-
-    // 🔄 update existing
-    await Promise.all(
-      existingItems.map((item) =>
-        API.put(`/items/my-item/${item._id}`, {
-          itemType: item.itemType,
-          conditions: item.conditions,
-        })
-      )
-    );
-
-    // ➕ create new
-    if (newItems.length > 0) {
-      await API.post("/items/setup", {
-        items: newItems.map((item) => ({
-          itemType: item.itemType,
-          conditions: item.conditions,
-        })),
-      });
+  // =========================
+  // 🚀 SUBMIT
+  // =========================
+  const submit = async () => {
+    if (hasDuplicate) {
+      toast.error("Duplicate items not allowed");
+      return;
     }
 
-    // 🔥 MARK SETUP COMPLETE (IMPORTANT)
-    await API.put("/settings/setup-complete");
+    if (hasInvalid) {
+      toast.error("Each item must have at least 1 quantity");
+      return;
+    }
 
-    // 🔥 REFRESH USER FROM BACKEND
-    await refreshUser();
+    try {
+      setSaving(true);
 
-    toast.success("Inventory setup completed successfully 🚀");
+      const newItems = items.filter((i) => !i._id);
+      const existingItems = items.filter((i) => i._id);
 
-    // 🔥 NOW SAFE TO NAVIGATE
-    navigate("/dashboard", { replace: true });
+      // 🔄 update existing
+      await Promise.all(
+        existingItems.map((item) =>
+          API.put(`/items/my-item/${item._id}`, {
+            itemType: item.itemType,
+            conditions: item.conditions,
+          })
+        )
+      );
 
-  } catch (error) {
-    console.log(error);
-    toast.error(
-      error.response?.data?.message || "Failed to save inventory"
-    );
-  } finally {
-    setSaving(false);
-  }
-};
+      // ➕ create new
+      if (newItems.length > 0) {
+        await API.post("/items/setup", {
+          items: newItems.map((item) => ({
+            itemType: item.itemType,
+            conditions: item.conditions,
+          })),
+        });
+      }
+
+      // 🔥 MARK SETUP COMPLETE
+      await API.put("/settings/setup-complete");
+
+      // 🔥 REFRESH USER STATE
+      await refreshUser();
+
+      toast.success("Inventory setup completed successfully 🚀");
+
+      // 🔥 NAVIGATE
+      navigate("/dashboard", { replace: true });
+
+    } catch (error) {
+      console.log(error);
+      toast.error(
+        error.response?.data?.message || "Failed to save inventory"
+      );
+    } finally {
+      setSaving(false);
+    }
+  };
 
   // =========================
-  // ⏳ LOADING UI (AUTH SAFE)
+  // ⏳ LOADING
   // =========================
   if (authLoading || loading) {
     return <p style={{ textAlign: "center" }}>Loading inventory...</p>;

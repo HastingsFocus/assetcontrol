@@ -5,6 +5,10 @@ const settingsSchema = new mongoose.Schema({
     type: Boolean,
     default: false,
   },
+  inventorySetupComplete: {
+  type: Boolean,
+  default: false,
+},
 }, { timestamps: true });
 
 export default mongoose.model("Settings", settingsSchema);

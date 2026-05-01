@@ -8,22 +8,24 @@ export default function LogoutButton() {
 
   const handleLogout = () => {
     try {
-      // 🔥 1. Auth cleanup (correct way)
+      // 🔥 1. Clear auth state (context + sessionStorage)
       logout();
 
-      // 🔥 2. Socket cleanup
+      // 🔥 2. Disconnect socket safely
       if (socket?.connected) {
         socket.disconnect();
       }
 
-      // 🔥 3. Redirect safely
+      // 🔥 3. Redirect
       navigate("/login", { replace: true });
 
     } catch (err) {
       console.log("Logout error:", err);
 
-      // fallback safety
-      localStorage.clear();
+      // 🔥 SAFE FALLBACK (IMPORTANT FIX)
+      sessionStorage.clear(); // instead of localStorage
+      socket?.disconnect?.();
+
       navigate("/login", { replace: true });
     }
   };

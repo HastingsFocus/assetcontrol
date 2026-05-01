@@ -38,7 +38,7 @@ export default function Login() {
     const { token, user } = res.data;
 
     // 🔐 Store token ONLY
-    localStorage.setItem("token", token);
+    sessionStorage.setItem("token", token);
 
     // 🔥 Update auth context (fast UI update)
     login({ token, user });

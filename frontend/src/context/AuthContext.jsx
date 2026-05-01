@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useState } from "react";
+import { createContext, useContext, useEffect, useRef, useState } from "react";
 import API from "../services/api";
 
 const AuthContext = createContext();
@@ -10,8 +10,11 @@ export const AuthProvider = ({ children }) => {
   const [token, setToken] = useState(localStorage.getItem("token"));
   const [loading, setLoading] = useState(true);
 
+  // 🔥 prevents duplicate /me calls
+  const hasLoaded = useRef(false);
+
   // =========================
-  // 🔥 LOAD FRESH USER FROM BACKEND
+  // 🔥 LOAD USER ONCE ONLY
   // =========================
   const loadUser = async () => {
     try {
@@ -24,32 +27,38 @@ export const AuthProvider = ({ children }) => {
       setToken(null);
 
       localStorage.removeItem("token");
-      localStorage.removeItem("user");
     } finally {
       setLoading(false);
     }
   };
 
   // =========================
-  // 🚀 INITIAL AUTH CHECK
+  // 🚀 INITIAL AUTH CHECK (RUN ONCE)
   // =========================
   useEffect(() => {
-    if (token) {
-      loadUser();
-    } else {
+    if (!token) {
       setLoading(false);
+      return;
     }
-  }, [token]);
+
+    if (hasLoaded.current) return; // 🔥 BLOCK DUPLICATES
+
+    hasLoaded.current = true;
+    loadUser();
+  }, []); // 🔥 IMPORTANT: EMPTY DEPENDENCY ARRAY
 
   // =========================
-  // 🔐 LOGIN (STORE TOKEN ONLY)
+  // 🔐 LOGIN
   // =========================
-  const login = (data) => {
-    setToken(data.token);
-    localStorage.setItem("token", data.token);
+  const login = ({ token, user }) => {
+    setToken(token);
+    localStorage.setItem("token", token);
 
-    // 🔥 DO NOT TRUST USER FROM LOGIN RESPONSE LONG-TERM
-    loadUser(); // immediately sync fresh data
+    // 🔥 OPTION 1 (fast UI)
+    setUser(user);
+
+    // 🔥 OPTION 2 (ENSURE TRUE SOURCE OF TRUTH)
+    loadUser();
   };
 
   // =========================
@@ -58,13 +67,13 @@ export const AuthProvider = ({ children }) => {
   const logout = () => {
     setUser(null);
     setToken(null);
+    hasLoaded.current = false;
 
     localStorage.removeItem("token");
-    localStorage.removeItem("user");
   };
 
   // =========================
-  // 🔄 MANUAL REFRESH USER (OPTIONAL BUT POWERFUL)
+  // 🔄 REFRESH USER MANUALLY
   // =========================
   const refreshUser = () => {
     if (token) loadUser();

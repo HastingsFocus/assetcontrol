@@ -74,9 +74,13 @@ export const registerUser = async (req, res) => {
 
 export const loginUser = async (req, res) => {
   try {
+    console.log("🚀 LOGIN HIT AT:", Date.now());
+    console.log("📩 REQUEST BODY:", req.body);
+
     const { email, password } = req.body;
 
     if (!email || !password) {
+      console.log("❌ Missing credentials");
       return res.status(400).json({
         message: "Please provide email and password",
       });
@@ -84,7 +88,10 @@ export const loginUser = async (req, res) => {
 
     const user = await User.findOne({ email });
 
+    console.log("👤 USER FOUND:", user?._id);
+
     if (!user) {
+      console.log("❌ User not found");
       return res.status(400).json({
         message: "Invalid email or password",
       });
@@ -92,17 +99,20 @@ export const loginUser = async (req, res) => {
 
     const isMatch = await bcrypt.compare(password, user.password);
 
+    console.log("🔐 PASSWORD MATCH:", isMatch);
+
     if (!isMatch) {
+      console.log("❌ Wrong password");
       return res.status(400).json({
         message: "Invalid email or password",
       });
     }
 
-    console.log("USER LOGGING IN:", user._id, user.role);
+    console.log("✅ USER LOGGING IN:", user._id, user.role);
 
     const token = generateToken(user);
 
-    console.log("TOKEN:", token); // ✅ FIXED POSITION
+    console.log("🎟️ TOKEN GENERATED:", token);
 
     return res.json({
       token,
@@ -117,7 +127,7 @@ export const loginUser = async (req, res) => {
     });
 
   } catch (err) {
-    console.error("LOGIN ERROR:", err); 
+    console.error("🔥 LOGIN ERROR:", err);
     return res.status(500).json({
       message: "Server error during login",
     });

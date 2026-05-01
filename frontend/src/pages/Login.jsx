@@ -35,20 +35,19 @@ export default function Login() {
     setLoading(true);
 
     const res = await API.post("/auth/login", form);
-    const { token } = res.data;
+    const { token, user } = res.data;
 
-    // 🔥 store token first
+    // 🔐 Store token ONLY
     localStorage.setItem("token", token);
 
-    // 🔥 fetch real user
-    const meRes = await API.get("/auth/me");
-    const user = meRes.data.user;
-
-    // 🔥 update context properly
+    // 🔥 Update auth context (fast UI update)
     login({ token, user });
 
     toast.success("Login successful 🚀");
 
+    // =========================
+    // 🚀 ROUTING
+    // =========================
     if (user.role === "admin") {
       navigate("/admin");
     } else {
@@ -56,7 +55,12 @@ export default function Login() {
     }
 
   } catch (error) {
-    toast.error(error.response?.data?.message || "Login failed");
+    const message =
+      error.response?.data?.message || "Login failed";
+
+    toast.error(message);
+    console.log("❌ LOGIN ERROR:", message);
+
   } finally {
     setLoading(false);
   }

@@ -8,7 +8,7 @@ import useNotifications from "../../hooks/useNotifications";
 import { useAuth } from "../../context/AuthContext";
 
 export default function AdminDashboard() {
-  const { user, loading } = useAuth(); // 🔥 FIXED (no duplicate fetch)
+  const { user, loading } = useAuth(); 
   const [active, setActive] = useState("assets");
 
   const { notifications, markAsRead } = useNotifications();

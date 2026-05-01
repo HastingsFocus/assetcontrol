@@ -98,6 +98,9 @@ export const loginUser = async (req, res) => {
       });
     }
 
+    console.log("USER LOGGING IN:", user._id, user.role);
+    console.log("TOKEN:", token);
+
     const token = generateToken(user);
 
     return res.json({

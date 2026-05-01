@@ -126,13 +126,16 @@ export const loginUser = async (req, res) => {
 
 export const getMe = async (req, res) => {
   try {
-    if (!req.user?._id) {
+    // 🔐 Ensure user was injected by auth middleware
+    if (!req.user || !req.user._id) {
       return res.status(401).json({
         message: "Not authorized",
       });
     }
 
-    // 🔥 ALWAYS fetch fresh user from DB
+    console.log("🔍 getMe user from token:", req.user._id);
+
+    // 🔥 Always fetch fresh data from DB (source of truth)
     const user = await User.findById(req.user._id).select("-password");
 
     if (!user) {
@@ -153,6 +156,8 @@ export const getMe = async (req, res) => {
     });
 
   } catch (error) {
+    console.error("❌ getMe error:", error.message);
+
     return res.status(500).json({
       message: "Server error",
     });

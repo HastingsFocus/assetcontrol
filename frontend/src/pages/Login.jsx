@@ -29,43 +29,38 @@ export default function Login() {
   // 🚀 LOGIN (CLEAN VERSION)
   // =========================
   const handleSubmit = async (e) => {
-    e.preventDefault();
+  e.preventDefault();
 
-    try {
-      setLoading(true);
+  try {
+    setLoading(true);
 
-      // 🔐 LOGIN API
-      const res = await API.post("/auth/login", form);
+    const res = await API.post("/auth/login", form);
+    const { token } = res.data;
 
-      const { token, user } = res.data;
+    // 🔥 store token first
+    localStorage.setItem("token", token);
 
-      // 🔥 STORE ONLY TOKEN (AuthContext handles everything else)
-      login({ token });
+    // 🔥 fetch real user
+    const meRes = await API.get("/auth/me");
+    const user = meRes.data.user;
 
-      toast.success("Login successful 🚀");
+    // 🔥 update context properly
+    login({ token, user });
 
-      // =========================
-      // 🔥 ROUTING LOGIC (SIMPLIFIED)
-      // =========================
-      if (user.role === "admin") {
-        navigate("/admin");
-        return;
-      }
+    toast.success("Login successful 🚀");
 
-      // 👉 LET ROUTE GUARD HANDLE SETUP LOGIC
+    if (user.role === "admin") {
+      navigate("/admin");
+    } else {
       navigate("/dashboard");
-
-    } catch (error) {
-      const message =
-        error.response?.data?.message || "Login failed";
-
-      toast.error(message);
-      console.log("❌ LOGIN ERROR:", message);
-
-    } finally {
-      setLoading(false);
     }
-  };
+
+  } catch (error) {
+    toast.error(error.response?.data?.message || "Login failed");
+  } finally {
+    setLoading(false);
+  }
+};
 
   return (
     <div>

@@ -99,9 +99,10 @@ export const loginUser = async (req, res) => {
     }
 
     console.log("USER LOGGING IN:", user._id, user.role);
-    console.log("TOKEN:", token);
 
     const token = generateToken(user);
+
+    console.log("TOKEN:", token); // ✅ FIXED POSITION
 
     return res.json({
       token,
@@ -116,6 +117,7 @@ export const loginUser = async (req, res) => {
     });
 
   } catch (err) {
+    console.error("LOGIN ERROR:", err); 
     return res.status(500).json({
       message: "Server error during login",
     });

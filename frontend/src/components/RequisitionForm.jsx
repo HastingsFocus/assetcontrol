@@ -84,9 +84,9 @@ export default function RequisitionForm() {
   };
 
   const priorityOptions = [
-    { value: "very_important", label: "Very Important", color: "text-red-600" },
-    { value: "important", label: "Important", color: "text-amber-600" },
-    { value: "not_important", label: "Not Important", color: "text-zinc-500" },
+    { value: "very_important", label: "Very Important", color: "text-rose-700 border-rose-300 bg-rose-50", ring: "ring-rose-500" },
+    { value: "important", label: "Important", color: "text-orange-700 border-orange-300 bg-orange-50", ring: "ring-orange-500" },
+    { value: "not_important", label: "Not Important", color: "text-sky-700 border-sky-300 bg-sky-50", ring: "ring-sky-500" },
   ];
 
   return (
@@ -157,30 +157,33 @@ export default function RequisitionForm() {
 
           {/* Priority */}
           <div>
-            <label className="block text-sm font-medium text-zinc-700 mb-1.5">
+            <label className="block text-sm font-medium text-zinc-700 mb-2 text-center">
               Priority Level
             </label>
-            <div className="grid grid-cols-3 gap-2">
-              {priorityOptions.map((opt) => (
-                <label
-                  key={opt.value}
-                  className={`flex items-center justify-center gap-2 px-3 py-2.5 rounded-lg border-2 cursor-pointer text-sm font-medium transition-all ${
-                    form.priority === opt.value
-                      ? "border-slate-500 bg-slate-50/95 text-slate-900 ring-1 ring-slate-500/25"
-                      : "border-zinc-200 bg-white text-zinc-600 hover:border-zinc-300 shadow-sm"
-                  }`}
-                >
-                  <input
-                    type="radio"
-                    name="priority"
-                    value={opt.value}
-                    checked={form.priority === opt.value}
-                    onChange={handleChange}
-                    className="hidden"
-                  />
-                  {opt.label}
-                </label>
-              ))}
+            <div className="grid grid-cols-3 gap-3">
+              {priorityOptions.map((opt) => {
+                const isSelected = form.priority === opt.value;
+                return (
+                  <label
+                    key={opt.value}
+                    className={`border rounded-lg p-3 text-center cursor-pointer transition ${opt.color} ${
+                      isSelected
+                        ? `ring-2 ${opt.ring} shadow-sm`
+                        : "opacity-70 hover:opacity-100"
+                    }`}
+                  >
+                    <input
+                      type="radio"
+                      name="priority"
+                      value={opt.value}
+                      checked={isSelected}
+                      onChange={handleChange}
+                      className="hidden"
+                    />
+                    <span className="block text-xs font-semibold uppercase">{opt.label}</span>
+                  </label>
+                );
+              })}
             </div>
           </div>
 

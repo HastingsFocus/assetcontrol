@@ -15,7 +15,12 @@ const notificationSchema = new mongoose.Schema(
 
     type: {
       type: String,
-      enum: ["request_created", "status_updated"],
+      enum: [
+        "request_created",
+        "status_updated",
+        "edit_access_requested",
+        "edit_access_decided",
+      ],
       default: "status_updated",
     },
 
@@ -24,6 +29,13 @@ const notificationSchema = new mongoose.Schema(
       type: mongoose.Schema.Types.ObjectId,
       ref: "Request",
       required: false, // optional but useful
+    },
+
+    // 🔗 LINK TO EDIT REQUEST (for inventory edit-access notifications)
+    editRequest: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "EditRequest",
+      required: false,
     },
     department: {
       type: String,

@@ -1,7 +1,9 @@
 import { useState, useEffect } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
+import API from "../../services/api";
 import AllRequests from "../../components/AllRequests";
 import InventoryOverview from "../../components/InventoryOverview";
+import EditRequestsList from "../../components/EditRequestsList";
 import socket from "../../socket";
 import useNotifications from "../../hooks/useNotifications";
 import { useAuth } from "../../context/AuthContext";
@@ -12,6 +14,44 @@ export default function AdminDashboard() {
   const { notifications, markAsRead } = useNotifications();
   const navigate = useNavigate();
   const location = useLocation();
+  const [pendingEditCount, setPendingEditCount] = useState(0);
+
+  // Pending edit-request badge: keep in sync with backend + socket events.
+  useEffect(() => {
+    const fetchPending = async () => {
+      try {
+        const res = await API.get("/edit-access");
+        const pending = (res.data || []).filter((r) => r.status === "pending").length;
+        setPendingEditCount(pending);
+      } catch (err) {
+        console.log("❌ fetch edit-access pending count error:", err);
+      }
+    };
+
+    fetchPending();
+
+    const handleNotification = (data) => {
+      if (
+        data?.type === "edit_access_requested" ||
+        data?.type === "edit_access_decided"
+      ) {
+        fetchPending();
+      }
+    };
+    socket.on("notification", handleNotification);
+    return () => socket.off("notification", handleNotification);
+  }, []);
+
+  // Refresh count whenever the admin views the edit-requests tab.
+  useEffect(() => {
+    if (active !== "editRequests") return;
+    API.get("/edit-access")
+      .then((res) => {
+        const pending = (res.data || []).filter((r) => r.status === "pending").length;
+        setPendingEditCount(pending);
+      })
+      .catch(() => {});
+  }, [active]);
 
   // =========================
   // AUTO SWITCH TAB FROM URL
@@ -88,6 +128,17 @@ export default function AdminDashboard() {
         <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
             d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+        </svg>
+      ),
+    },
+    {
+      id: "editRequests",
+      label: "Edit Requests",
+      badge: pendingEditCount > 0 ? pendingEditCount : null,
+      icon: (
+        <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+            d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
         </svg>
       ),
     },
@@ -183,6 +234,7 @@ export default function AdminDashboard() {
             <h1 className="text-lg font-semibold tracking-tight text-zinc-900">
               {active === "assets" && "Inventory Overview"}
               {active === "requests" && "All Requests"}
+              {active === "editRequests" && "Inventory Edit Requests"}
               {active === "notifications" && "Notifications"}
             </h1>
             <p className="text-xs text-zinc-500">
@@ -212,6 +264,8 @@ export default function AdminDashboard() {
               highlightId={new URLSearchParams(location.search).get("requestId")}
             />
           )}
+
+          {active === "editRequests" && <EditRequestsList />}
 
           {active === "notifications" && (
             <div className="mx-auto w-full max-w-2xl">

@@ -53,10 +53,21 @@ export default function InventoryOverview() {
     return acc;
   }, {});
 
-  const totalItems = data.length;
+  // Sum every unit across every condition — not just the number of item records.
   const totalGood = data.reduce((s, i) => s + (i.conditions?.good || 0), 0);
   const totalFair = data.reduce((s, i) => s + (i.conditions?.fair || 0), 0);
   const totalPoor = data.reduce((s, i) => s + (i.conditions?.poor || 0), 0);
+  const totalItems = totalGood + totalFair + totalPoor;
+
+  const sumUnits = (list) =>
+    list.reduce(
+      (s, i) =>
+        s +
+        (i.conditions?.good || 0) +
+        (i.conditions?.fair || 0) +
+        (i.conditions?.poor || 0),
+      0
+    );
 
   if (loading) {
     return (
@@ -111,9 +122,14 @@ export default function InventoryOverview() {
                 <div className="w-2 h-2 rounded-full bg-slate-500 shadow-sm shadow-slate-600/35"></div>
                 <h3 className="font-semibold tracking-tight text-zinc-900">{dept}</h3>
               </div>
-              <span className="text-xs text-blue-800 bg-blue-100 px-2.5 py-1 rounded-full font-semibold ring-1 ring-blue-200">
-                {items.length} item{items.length !== 1 ? "s" : ""}
-              </span>
+              {(() => {
+                const deptUnits = sumUnits(items);
+                return (
+                  <span className="text-xs text-blue-800 bg-blue-100 px-2.5 py-1 rounded-full font-semibold ring-1 ring-blue-200">
+                    {deptUnits} item{deptUnits !== 1 ? "s" : ""}
+                  </span>
+                );
+              })()}
             </div>
 
             {/* Items Table */}

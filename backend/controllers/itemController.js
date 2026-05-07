@@ -2,6 +2,16 @@ import Item from "../models/Item.js";
 import ItemType from "../models/ItemType.js";
 import User from "../models/User.js";
 import { broadcastInventoryUpdate } from "../socket.js";
+import { ensureCanEditInventory } from "./editRequestController.js";
+
+// Shared 403 message for blocked inventory mutations.
+const lockedResponse = (res, reason) => {
+  const message =
+    reason === "pending"
+      ? "Your edit request is pending admin approval."
+      : "Inventory is locked. Request edit access to make changes.";
+  return res.status(403).json({ message, locked: true, reason });
+};
 
 
 export const checkSetup = async (req, res) => {
@@ -55,6 +65,12 @@ export const setupInventory = async (req, res) => {
       return res.status(403).json({
         message: "Admin cannot manage inventory",
       });
+    }
+
+    // First-time setup is allowed; subsequent overwrites need approved edit access.
+    const gate = await ensureCanEditInventory(userId);
+    if (!gate.allowed) {
+      return lockedResponse(res, gate.reason);
     }
 
     const { items } = req.body;
@@ -193,6 +209,11 @@ export const updateMyItem = async (req, res) => {
       });
     }
 
+    const gate = await ensureCanEditInventory(req.user._id);
+    if (!gate.allowed) {
+      return lockedResponse(res, gate.reason);
+    }
+
     const item = await Item.findOne({
       _id: id,
       owner: req.user._id,
@@ -262,6 +283,11 @@ export const updateCondition = async (req, res) => {
 
 export const deleteMyItem = async (req, res) => {
   try {
+    const gate = await ensureCanEditInventory(req.user._id);
+    if (!gate.allowed) {
+      return lockedResponse(res, gate.reason);
+    }
+
     const item = await Item.findOneAndDelete({
       _id: req.params.id,
       owner: req.user._id,
@@ -292,6 +318,8 @@ export const createMyItem = async (req, res) => {
     if (!itemType) {
       return res.status(400).json({ message: "Item type required" });
     }
+
+    // Adding a brand-new item is always allowed — only edits/deletes need approval.
 
     const item = await Item.create({
       itemType,

@@ -1,4 +1,6 @@
-function Layout({ children, role, logout }) {
+import LogoutButton from "./LogoutButton";
+
+function Layout({ children, role }) {
   return (
     <div className="flex min-h-screen bg-zinc-100">
 
@@ -8,29 +10,28 @@ function Layout({ children, role, logout }) {
           <h1 className="text-xl font-semibold tracking-tight mb-1 text-zinc-100">
             St Joseph&apos;s College
           </h1>
-          <p className="text-xs uppercase tracking-wider text-blue-200/90 mb-8">Procurement</p>
+
+          <p className="text-xs uppercase tracking-wider text-blue-200/90 mb-8">
+            Procurement
+          </p>
 
           <p className="mb-6 text-sm text-slate-200/80">
             {role}
           </p>
 
           <div className="space-y-1">
-            <button type="button" className="w-full text-left text-slate-200/80 hover:bg-slate-600/60 hover:text-white p-2.5 rounded-lg text-sm font-medium transition">
+            <button className="w-full text-left text-slate-200/80 hover:bg-slate-600/60 hover:text-white p-2.5 rounded-lg text-sm font-medium transition">
               Dashboard
             </button>
-            <button type="button" className="w-full text-left text-slate-200/80 hover:bg-slate-600/60 hover:text-white p-2.5 rounded-lg text-sm font-medium transition">
+
+            <button className="w-full text-left text-slate-200/80 hover:bg-slate-600/60 hover:text-white p-2.5 rounded-lg text-sm font-medium transition">
               Requests
             </button>
           </div>
         </div>
 
-        <button
-          type="button"
-          onClick={logout}
-          className="bg-red-600/95 hover:bg-red-600 text-white text-sm font-medium p-2.5 rounded-lg mt-10 ring-1 ring-red-500/30 transition"
-        >
-          Logout
-        </button>
+        {/* 🔥 reusable logout button */}
+        <LogoutButton />
 
       </div>
 

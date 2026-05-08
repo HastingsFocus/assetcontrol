@@ -213,15 +213,27 @@ export default function AdminDashboard() {
         {/* Logout */}
         <div className="px-3 py-4 border-t border-slate-300/15">
           <button
-            onClick={handleLogout}
-            className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium bg-red-600/95 hover:bg-red-600 text-white shadow-sm ring-1 ring-red-500/30 transition-all"
-          >
-            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-                d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
-            </svg>
-            Logout
-          </button>
+  onClick={handleLogout}
+  className="w-full relative flex items-center justify-center px-3 py-2.5 rounded-lg text-sm font-medium bg-red-600/95 hover:bg-red-600 text-white shadow-sm ring-1 ring-red-500/30 transition-all"
+>
+  {/* Icon positioned absolutely */}
+  <svg
+    className="w-5 h-5 absolute left-3"
+    fill="none"
+    viewBox="0 0 24 24"
+    stroke="currentColor"
+  >
+    <path
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      strokeWidth={2}
+      d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"
+    />
+  </svg>
+
+  {/* Centered text */}
+  <span>Logout</span>
+</button>
         </div>
       </aside>
 

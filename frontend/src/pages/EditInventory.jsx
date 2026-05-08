@@ -237,29 +237,7 @@ export default function EditInventory() {
 
   return (
     <div className="flex min-h-screen flex-col bg-zinc-50">
-      {/* Header */}
-      <div className="shrink-0 bg-gradient-to-r from-slate-700 via-slate-700 to-slate-600 text-white px-6 py-4 border-b border-slate-500/30">
-        <div className="max-w-2xl mx-auto flex flex-col gap-4 sm:flex-row sm:items-center sm:gap-6">
-          <button
-            type="button"
-            onClick={() => navigate("/dashboard")}
-            className="inline-flex shrink-0 items-center gap-2 self-start rounded-lg bg-white/10 px-3 py-2 text-sm font-medium text-white ring-1 ring-inset ring-white/15 transition hover:bg-white/20"
-          >
-            <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
-            </svg>
-            Dashboard
-          </button>
-          <div className="hidden h-10 w-px shrink-0 bg-white/20 sm:block" aria-hidden="true" />
-          <div className="min-w-0 flex-1">
-            <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-100/90 mb-1">
-              St. Joseph's College
-            </p>
-            <h1 className="text-xl font-semibold tracking-tight">Manage Inventory</h1>
-            <p className="text-zinc-300 text-sm mt-0.5">{user?.department || "Your Department"}</p>
-          </div>
-        </div>
-      </div>
+     
 
       <div className="flex flex-1 flex-col items-center px-4 py-10 sm:px-6">
         <div className="w-full max-w-2xl">

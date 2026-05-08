@@ -90,6 +90,8 @@ export default function RequisitionForm() {
   ];
 
   return (
+      <div className="min-h-screen bg-zinc-50 flex justify-center px-4 pt-6 pb-10">
+
     <div className="w-full max-w-xl">
       <div className="bg-white rounded-2xl shadow-md shadow-zinc-900/6 border border-zinc-200/90 overflow-hidden ring-1 ring-zinc-100">
 
@@ -210,6 +212,7 @@ export default function RequisitionForm() {
           </button>
         </div>
       </div>
+    </div>
     </div>
   );
 }

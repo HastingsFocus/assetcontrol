@@ -1,20 +1,19 @@
-import { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { useEffect, useState } from "react";
 import API from "../services/api";
-import RequisitionForm from "../components/RequisitionForm";
-import MyRequests from "../components/MyRequests";
 import socket from "../socket";
 import { useAuth } from "../context/AuthContext";
+import { Outlet, useLocation, useNavigate } from "react-router-dom";
 
 export default function Dashboard() {
-  const { user, loading } = useAuth(); 
-  const navigate = useNavigate();
+  const { user, loading } = useAuth();
 
-  const [active, setActive] = useState("requisition");
   const [notifications, setNotifications] = useState([]);
 
+  const location = useLocation();
+  const navigate = useNavigate();
+
   // =========================
-  // 🔥 LOAD NOTIFICATIONS (PERSISTED)
+  // LOAD NOTIFICATIONS
   // =========================
   useEffect(() => {
     if (!user?._id) return;
@@ -32,7 +31,7 @@ export default function Dashboard() {
   }, [user]);
 
   // =========================
-  // 🔥 SOCKET REAL-TIME UPDATES
+  // SOCKET REAL-TIME
   // =========================
   useEffect(() => {
     if (!user?._id) return;
@@ -42,6 +41,7 @@ export default function Dashboard() {
     const handleNotification = (data) => {
       setNotifications((prev) => {
         const exists = prev.some((n) => n._id === data._id);
+
         if (exists) return prev;
 
         return [data, ...prev];
@@ -50,136 +50,92 @@ export default function Dashboard() {
 
     socket.on("notification", handleNotification);
 
-    return () => {
-      socket.off("notification", handleNotification);
-    };
+    return () => socket.off("notification", handleNotification);
   }, [user]);
 
   // =========================
-  // 🚪 LOGOUT
-  // =========================
-  const handleLogout = () => {
-    localStorage.removeItem("token");
-    socket.disconnect();
-    navigate("/login");
-  };
-
-  // =========================
-  // ⏳ LOADING GUARD
+  // LOADING
   // =========================
   if (loading || !user) {
-    return <p style={{ padding: 20 }}>Loading dashboard...</p>;
+    return (
+      <div className="min-h-screen bg-zinc-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="w-10 h-10 border-4 border-slate-500 border-t-transparent rounded-full animate-spin mx-auto mb-3"></div>
+
+          <p className="text-gray-500 text-sm">
+            Loading dashboard...
+          </p>
+        </div>
+      </div>
+    );
   }
 
   // =========================
-  // 🔥 UNREAD COUNT
-  // =========================
-  const unreadCount = notifications.filter((n) => !n.isRead).length;
+// PAGE TITLES
+// =========================
+let pageTitle = "Dashboard";
 
-  // =========================
-  // 🎨 UI
-  // =========================
+if (location.pathname.includes("requisition")) {
+  pageTitle = "Place Requisition";
+}
+
+if (location.pathname.includes("my-requests")) {
+  pageTitle = "My Requests";
+}
+
+if (location.pathname.includes("notifications")) {
+  pageTitle = "Notifications";
+}
+
+if (location.pathname.includes("edit-inventory")) {
+  pageTitle = "Edit Inventory";
+}
+
+  const unreadCount = notifications.filter(
+    (n) => !n.isRead
+  ).length;
+
   return (
-    <div style={{ display: "flex", height: "100vh" }}>
+    <div className="min-h-screen bg-zinc-50">
 
-      {/* 🟦 SIDEBAR */}
-      <div
-        style={{
-          width: "250px",
-          background: "#1f2937",
-          color: "white",
-          padding: "20px",
-          display: "flex",
-          flexDirection: "column",
-          justifyContent: "space-between",
-        }}
-      >
-
+      {/* TOP BAR */}
+      <header className="bg-white border-b border-zinc-200 px-8 py-4 flex items-center justify-between shadow-sm">
         <div>
-          <h3 style={{ marginBottom: "5px" }}>
-            👤 {user?.name}
-          </h3>
+          <h1 className="text-lg font-semibold tracking-tight text-zinc-900">
+            {pageTitle}
+          </h1>
 
-          <p style={{ fontSize: "12px", opacity: 0.7 }}>
-            {user?.email}
+          <p className="text-xs text-zinc-500">
+            {new Date().toLocaleDateString("en-GB", {
+              weekday: "long",
+              year: "numeric",
+              month: "long",
+              day: "numeric",
+            })}
           </p>
-
-          <hr />
-
-          <div style={{ marginTop: "20px", display: "flex", flexDirection: "column", gap: "15px" }}>
-            <button onClick={() => setActive("requisition")}>
-              📦 Place Requisition
-            </button>
-
-            <button onClick={() => setActive("myRequests")}>
-              📋 My Requests
-            </button>
-
-            {/* 🔥 UNREAD BADGE */}
-            <button onClick={() => setActive("notifications")}>
-              🔔 Notifications ({unreadCount})
-            </button>
-
-            <button onClick={() => navigate("/edit-inventory")}>
-              ✏️ Edit Inventory
-            </button>
-          </div>
         </div>
 
-        {/* LOGOUT */}
-        <button
-          onClick={handleLogout}
-          style={{
-            background: "#dc2626",
-            color: "white",
-            border: "none",
-            padding: "10px",
-            borderRadius: "6px",
-            cursor: "pointer",
-          }}
-        >
-          🚪 Logout
-        </button>
-      </div>
+        {unreadCount > 0 && (
+          <button
+            onClick={() => navigate("/dashboard/notifications")}
+            className="flex items-center gap-2 text-sm text-amber-600 bg-amber-50 border border-amber-200 px-3 py-1.5 rounded-lg hover:bg-amber-100 transition"
+          >
+            <svg
+              className="w-4 h-4"
+              fill="currentColor"
+              viewBox="0 0 20 20"
+            >
+              <path d="M10 2a6 6 0 00-6 6v3.586l-.707.707A1 1 0 004 14h12a1 1 0 00.707-1.707L16 11.586V8a6 6 0 00-6-6zM10 18a3 3 0 01-2.83-2h5.66A3 3 0 0110 18z" />
+            </svg>
 
-      {/* 🟩 MAIN CONTENT */}
-      <div style={{ flex: 1, padding: "20px" }}>
-
-        {active === "requisition" && <RequisitionForm />}
-
-        {active === "myRequests" && <MyRequests />}
-
-        {active === "notifications" && (
-          <div>
-            <h2>🔔 Notifications</h2>
-
-            {notifications.length === 0 ? (
-              <p>No notifications yet</p>
-            ) : (
-              notifications.map((n) => (
-                <div
-                  key={n._id}
-                  style={{
-                    padding: "10px",
-                    margin: "10px 0",
-                    borderRadius: "6px",
-
-                    // 🔥 READ / UNREAD VISUAL
-                    background: n.isRead ? "#f3f4f6" : "#ffffff",
-                    borderLeft: n.isRead
-                      ? "4px solid #9ca3af"
-                      : "4px solid #2563eb",
-
-                    boxShadow: "0 1px 3px rgba(0,0,0,0.1)",
-                  }}
-                >
-                  <p style={{ margin: 0 }}>{n.message}</p>
-                </div>
-              ))
-            )}
-          </div>
+            {unreadCount} unread
+          </button>
         )}
+      </header>
 
+      {/* PAGE CONTENT */}
+      <div className="px-6 py-8">
+        <Outlet />
       </div>
     </div>
   );

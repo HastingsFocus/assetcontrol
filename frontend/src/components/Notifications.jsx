@@ -7,7 +7,7 @@ export default function Notifications() {
   const [loading, setLoading] = useState(true);
 
   // =========================
-  // 📦 FETCH NOTIFICATIONS
+  // FETCH NOTIFICATIONS
   // =========================
   const fetchNotifications = useCallback(async () => {
     try {
@@ -24,17 +24,17 @@ export default function Notifications() {
   }, []);
 
   // =========================
-  // 🔄 SOCKET + INIT
+  // INITIAL LOAD + SOCKET
   // =========================
   useEffect(() => {
     fetchNotifications();
 
     const handleNotification = (data) => {
-      console.log("🔔 PAGE RECEIVED:", data);
-
       setNotifications((prev) => {
-        // 🔥 prevent duplicates
-        const exists = prev.some((n) => n._id === data._id);
+        const exists = prev.some(
+          (n) => n._id === data._id
+        );
+
         if (exists) return prev;
 
         return [data, ...prev];
@@ -43,22 +43,22 @@ export default function Notifications() {
 
     socket.on("notification", handleNotification);
 
-    return () => {
+    return () =>
       socket.off("notification", handleNotification);
-    };
   }, [fetchNotifications]);
 
   // =========================
-  // ✔ MARK AS READ (FIXED ROUTE)
+  // MARK AS READ
   // =========================
   const markAsRead = async (id) => {
     try {
-      // 🔥 FIXED ROUTE (your backend uses /read)
       await API.put(`/notifications/${id}/read`);
 
       setNotifications((prev) =>
         prev.map((n) =>
-          n._id === id ? { ...n, isRead: true } : n
+          n._id === id
+            ? { ...n, isRead: true }
+            : n
         )
       );
     } catch (err) {
@@ -67,31 +67,42 @@ export default function Notifications() {
   };
 
   // =========================
-  // 📅 FORMAT DATE
+  // MARK ALL AS READ
+  // =========================
+  const markAllAsRead = async () => {
+    const unread = notifications.filter(
+      (n) => !n.isRead
+    );
+
+    await Promise.all(
+      unread.map((n) => markAsRead(n._id))
+    );
+  };
+
+  // =========================
+  // FORMAT DATE
   // =========================
   const formatDate = (date) => {
     if (!date) return "No date";
 
     const d = new Date(date);
+
     const now = new Date();
 
-    const isToday =
-      d.toDateString() === now.toDateString();
-
     const yesterday = new Date();
+
     yesterday.setDate(now.getDate() - 1);
 
-    const isYesterday =
-      d.toDateString() === yesterday.toDateString();
-
-    if (isToday) {
+    if (d.toDateString() === now.toDateString()) {
       return d.toLocaleTimeString([], {
         hour: "2-digit",
         minute: "2-digit",
       });
     }
 
-    if (isYesterday) return "Yesterday";
+    if (d.toDateString() === yesterday.toDateString()) {
+      return "Yesterday";
+    }
 
     return d.toLocaleDateString([], {
       day: "numeric",
@@ -100,39 +111,117 @@ export default function Notifications() {
     });
   };
 
-  // =========================
-  // UI
-  // =========================
+  const unreadCount = notifications.filter(
+    (n) => !n.isRead
+  ).length;
+
   return (
-    <div style={{ padding: "20px" }}>
-      <h2>🔔 Notifications</h2>
+    <div className="max-w-2xl mx-auto">
 
-      {loading && <p>Loading...</p>}
+      {/* ACTION BAR */}
+      {!loading && notifications.length > 0 && (
+        <div className="flex items-center justify-between mb-5">
+          <p className="text-sm text-gray-500">
+            {unreadCount > 0
+              ? `${unreadCount} unread notification${
+                  unreadCount !== 1 ? "s" : ""
+                }`
+              : "All caught up!"}
+          </p>
 
-      {!loading && notifications.length === 0 && (
-        <p>No notifications yet</p>
+          {unreadCount > 0 && (
+            <button
+              onClick={markAllAsRead}
+              className="text-sm text-slate-700 hover:text-slate-900 font-medium transition"
+            >
+              Mark all as read
+            </button>
+          )}
+        </div>
       )}
 
-      {notifications.map((n) => (
-        <div
-          key={n._id}
-          onClick={() => markAsRead(n._id)}
-          style={{
-            padding: "12px",
-            marginBottom: "10px",
-            border: "1px solid #ddd",
-            borderRadius: "8px",
-            background: n.isRead ? "#f8f8f8" : "#e6f7ff",
-            cursor: "pointer",
-          }}
-        >
-          <p style={{ margin: 0 }}>{n.message}</p>
-
-          <small style={{ color: "#666" }}>
-            {formatDate(n.createdAt)}
-          </small>
+      {/* LOADING */}
+      {loading && (
+        <div className="flex justify-center py-16">
+          <div className="w-8 h-8 border-4 border-slate-500 border-t-transparent rounded-full animate-spin"></div>
         </div>
-      ))}
+      )}
+
+      {/* EMPTY STATE */}
+      {!loading && notifications.length === 0 && (
+        <div className="text-center py-16">
+
+          <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
+            <svg
+              className="w-8 h-8 text-gray-400"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={1.5}
+                d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"
+              />
+            </svg>
+          </div>
+
+          <p className="text-gray-500 font-medium">
+            No notifications yet
+          </p>
+
+          <p className="text-gray-400 text-sm mt-1">
+            You'll see updates about your requests here.
+          </p>
+
+        </div>
+      )}
+
+      {/* NOTIFICATION LIST */}
+      {!loading && notifications.length > 0 && (
+        <div className="space-y-3">
+
+          {notifications.map((n) => (
+            <div
+              key={n._id}
+              onClick={() =>
+                !n.isRead && markAsRead(n._id)
+              }
+              className={`relative p-4 rounded-xl border-l-4 shadow-sm cursor-pointer transition-all ${
+                n.isRead
+                  ? "bg-white border-gray-200 opacity-80"
+                  : "bg-slate-50/90 border-slate-500 ring-1 ring-slate-500/15"
+              }`}
+            >
+              {/* UNREAD DOT */}
+              {!n.isRead && (
+                <div className="absolute top-4 right-4 w-2.5 h-2.5 bg-slate-500 rounded-full shadow-sm shadow-slate-600/40"></div>
+              )}
+
+              <div className="flex items-start justify-between pr-6">
+
+                <div className="flex-1">
+                  <p className="text-sm text-gray-800 font-medium">
+                    {n.message}
+                  </p>
+
+                  <p className="text-xs text-gray-400 mt-1.5">
+                    {formatDate(n.createdAt)}
+                  </p>
+                </div>
+
+              </div>
+
+              {!n.isRead && (
+                <p className="text-xs text-slate-600 font-medium mt-2">
+                  Click to mark as read
+                </p>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

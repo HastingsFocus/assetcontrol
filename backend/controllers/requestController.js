@@ -27,6 +27,21 @@ export const createRequest = async (req, res) => {
       });
     }
 
+    const parsedRequiredDate = new Date(requiredDate);
+    if (Number.isNaN(parsedRequiredDate.getTime())) {
+      return res.status(400).json({
+        message: "Invalid required date",
+      });
+    }
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    parsedRequiredDate.setHours(0, 0, 0, 0);
+    if (parsedRequiredDate <= today) {
+      return res.status(400).json({
+        message: "Required date must be a future date",
+      });
+    }
+
     // =========================
     // 🔍 CHECK ITEM TYPE
     // =========================
@@ -180,6 +195,14 @@ export const updateRequestStatus = async (req, res) => {
         });
       }
 
+      // Only pending requests can be approved/rejected.
+      // This prevents invalid transitions like rejected -> approved.
+      if (request.status !== "pending") {
+        return res.status(400).json({
+          message: `Cannot change status from ${request.status}`,
+        });
+      }
+
       updateData.status = status;
     }
 
@@ -187,6 +210,17 @@ export const updateRequestStatus = async (req, res) => {
     // APPROVED QUANTITY
     // ============================
     if (approvedQuantity !== undefined) {
+      if (request.status !== "approved" && status !== "approved") {
+        return res.status(400).json({
+          message: "Approved quantity can only be set for approved requests",
+        });
+      }
+      if (request.approvedQuantity !== null && request.approvedQuantity !== undefined) {
+        return res.status(400).json({
+          message: "Approved quantity is already saved and cannot be edited",
+        });
+      }
+
       if (approvedQuantity <= 0) {
         return res.status(400).json({
           message: "Approved quantity must be greater than 0",

@@ -54,7 +54,7 @@ function App() {
     };
 
     loadUser();
-  }, [token]);
+  }, [token, login, logout]);
 
   // =========================
   // GLOBAL SOCKET LISTENER
@@ -80,11 +80,13 @@ function App() {
               PUBLIC ROUTES
           ========================= */}
           <Route path="/" element={<Navigate to="/login" />} />
+          
           <Route path="/login" element={<Login />} />
+          
           <Route path="/register" element={<Register />} />
 
           {/* =========================
-              DASHBOARD LAYOUT (MASTER)
+              DASHBOARD ROUTES
           ========================= */}
           <Route
             path="/dashboard"
@@ -94,28 +96,39 @@ function App() {
               </ProtectedDashboard>
             }
           >
+            {/* DEFAULT PAGE */}
+            <Route index element={<Dashboard />} />
 
-            {/* ALL CHILD ROUTES SHARE SAME LAYOUT */}
+            {/* USER ROUTES */}
+            <Route
+              path="requisition"
+              element={<RequisitionForm />}
+            />
 
-            <Route element={<Dashboard />}>
-              
-              {/* DEFAULT DASHBOARD */}
-              <Route index element={<RequisitionForm />} />
+            <Route
+              path="my-requests"
+              element={<MyRequests />}
+            />
 
-              <Route path="requisition" element={<RequisitionForm />} />
-              <Route path="my-requests" element={<MyRequests />} />
-              <Route path="notifications" element={<Notifications />} />
+            <Route
+              path="notifications"
+              element={<Notifications />}
+            />
 
-              {/* MOVE THESE INSIDE DASHBOARD TREE */}
-              <Route path="edit-inventory" element={<EditInventory />} />
-              <Route path="setup-inventory" element={<SetUpInventory />} />
+            {/* INVENTORY ROUTES */}
+            <Route
+              path="edit-inventory"
+              element={<EditInventory />}
+            />
 
-            </Route>
-
+            <Route
+              path="setup-inventory"
+              element={<SetUpInventory />}
+            />
           </Route>
 
           {/* =========================
-              ADMIN
+              ADMIN ROUTE
           ========================= */}
           <Route
             path="/admin"
@@ -133,6 +146,9 @@ function App() {
         </Routes>
       </BrowserRouter>
 
+      {/* =========================
+          TOASTS
+      ========================= */}
       <ToastContainer
         position="top-right"
         autoClose={3000}

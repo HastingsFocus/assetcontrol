@@ -4,16 +4,30 @@ import API from "../services/api";
 import { useAuth } from "../context/AuthContext";
 import { toast } from "react-toastify";
 
-export default function AuthSplitPanel({ initialMode = "signin" }) {
+export default function AuthSplitPanel({
+  initialMode = "signin",
+}) {
   const navigate = useNavigate();
   const { login } = useAuth();
 
-  const [activePanel, setActivePanel] = useState(initialMode);
+  // =========================
+  // STATE
+  // =========================
+  const [activePanel, setActivePanel] =
+    useState(initialMode);
+
   const [loading, setLoading] = useState(false);
-  const [showPassword, setShowPassword] = useState(false);
+
+  const [showPassword, setShowPassword] =
+    useState(false);
+
   const [error, setError] = useState("");
 
-  const [signinForm, setSigninForm] = useState({ email: "", password: "" });
+  const [signinForm, setSigninForm] = useState({
+    email: "",
+    password: "",
+  });
+
   const [signupForm, setSignupForm] = useState({
     name: "",
     email: "",
@@ -21,20 +35,40 @@ export default function AuthSplitPanel({ initialMode = "signin" }) {
     confirmPassword: "",
   });
 
+  // =========================
+  // PASSWORD VALIDATION
+  // =========================
   const validatePassword = (password) => ({
     minLength: password.length >= 6,
     hasUpper: /[A-Z]/.test(password),
     hasLower: /[a-z]/.test(password),
     hasNumber: /[0-9]/.test(password),
-    hasSymbol: /[!@#$%^&*(),.?":{}|<>]/.test(password),
+    hasSymbol: /[!@#$%^&*(),.?":{}|<>]/.test(
+      password
+    ),
   });
 
+  // =========================
+  // PASSWORD STRENGTH
+  // =========================
   const strength = useMemo(() => {
-    const rules = validatePassword(signupForm.password);
-    return Object.values(rules).filter(Boolean).length;
+    const rules = validatePassword(
+      signupForm.password
+    );
+
+    return Object.values(rules).filter(Boolean)
+      .length;
   }, [signupForm.password]);
 
-  const strengthLabel = ["", "Very Weak", "Weak", "Fair", "Good", "Strong"][strength];
+  const strengthLabel = [
+    "",
+    "Very Weak",
+    "Weak",
+    "Fair",
+    "Good",
+    "Strong",
+  ][strength];
+
   const strengthColor = [
     "",
     "bg-red-500",
@@ -44,79 +78,172 @@ export default function AuthSplitPanel({ initialMode = "signin" }) {
     "bg-slate-500",
   ][strength];
 
+  // =========================
+  // INPUT CHANGES
+  // =========================
   const handleSigninChange = (e) => {
-    setSigninForm((prev) => ({ ...prev, [e.target.name]: e.target.value }));
+    setSigninForm((prev) => ({
+      ...prev,
+      [e.target.name]: e.target.value,
+    }));
+
     setError("");
   };
 
   const handleSignupChange = (e) => {
-    setSignupForm((prev) => ({ ...prev, [e.target.name]: e.target.value }));
+    setSignupForm((prev) => ({
+      ...prev,
+      [e.target.name]: e.target.value,
+    }));
+
     setError("");
   };
 
+  // =========================
+  // SIGN IN
+  // =========================
   const handleSignin = async (e) => {
     e.preventDefault();
+
     try {
       setLoading(true);
-      const res = await API.post("/auth/login", signinForm);
+
+      const res = await API.post(
+        "/auth/login",
+        signinForm
+      );
+
       const { token, user } = res.data;
 
+      // SAVE TOKEN
       sessionStorage.setItem("token", token);
+
+      // SAVE AUTH STATE
       login({ token, user });
+
       toast.success("Login successful");
-      navigate(user.role === "admin" ? "/admin" : "/dashboard");
+
+      // REDIRECT
+      navigate(
+        user.role === "admin"
+          ? "/admin"
+          : "/dashboard/requisition",
+        { replace: true }
+      );
+
     } catch (err) {
-      const message = err.response?.data?.message || "Login failed";
+      const message =
+        err.response?.data?.message ||
+        "Login failed";
+
       setError(message);
+
       toast.error(message);
+
     } finally {
       setLoading(false);
     }
   };
 
+  // =========================
+  // SIGN UP
+  // =========================
   const handleSignup = async (e) => {
     e.preventDefault();
 
-    const rules = validatePassword(signupForm.password);
-    if (!rules.minLength || !rules.hasUpper || !rules.hasLower || !rules.hasNumber || !rules.hasSymbol) {
-      const message = "Password must be at least 6 characters with uppercase, lowercase, number & symbol.";
+    const rules = validatePassword(
+      signupForm.password
+    );
+
+    // PASSWORD RULES
+    if (
+      !rules.minLength ||
+      !rules.hasUpper ||
+      !rules.hasLower ||
+      !rules.hasNumber ||
+      !rules.hasSymbol
+    ) {
+      const message =
+        "Password must be at least 6 characters with uppercase, lowercase, number & symbol.";
+
       setError(message);
+
       toast.error(message);
+
       return;
     }
-    if (signupForm.password !== signupForm.confirmPassword) {
+
+    // PASSWORD MATCH
+    if (
+      signupForm.password !==
+      signupForm.confirmPassword
+    ) {
       setError("Passwords do not match");
+
+      toast.error("Passwords do not match");
+
       return;
     }
 
     try {
       setLoading(true);
-      const res = await API.post("/auth/register", {
-        name: signupForm.name,
-        email: signupForm.email,
-        password: signupForm.password,
-      });
+
+      const res = await API.post(
+        "/auth/register",
+        {
+          name: signupForm.name,
+          email: signupForm.email,
+          password: signupForm.password,
+        }
+      );
+
       const { token, user } = res.data;
 
+      // AUTO LOGIN
       if (token) {
         sessionStorage.setItem("token", token);
+
         login({ token, user });
-        toast.success("Account created successfully");
-        navigate(user.role === "admin" ? "/admin" : "/dashboard");
+
+        toast.success(
+          "Account created successfully"
+        );
+
+        // REDIRECT
+        navigate(
+          user.role === "admin"
+            ? "/admin"
+            : "/dashboard/requisition",
+          { replace: true }
+        );
+
       } else {
-        toast.success("Registration successful! Please login.");
+        toast.success(
+          "Registration successful! Please login."
+        );
+
         setActivePanel("signin");
       }
+
     } catch (err) {
-      const message = err.response?.data?.message || "Registration failed";
+      const message =
+        err.response?.data?.message ||
+        "Registration failed";
+
       setError(message);
+
       toast.error(message);
+
     } finally {
       setLoading(false);
     }
   };
 
-  const isSignin = activePanel === "signin";
+  // =========================
+  // ACTIVE MODE
+  // =========================
+  const isSignin =
+    activePanel === "signin";
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-200 via-zinc-100 to-slate-300 flex flex-col items-center justify-center px-4 py-8 sm:py-12">

@@ -84,44 +84,68 @@ export default function SetupInventory() {
   const hasInvalid = items.some((item) => !item.itemType || getTotal(item.conditions) === 0);
 
   const submit = async () => {
-    if (hasDuplicate) { toast.error("Duplicate items not allowed"); return; }
-    if (hasInvalid) { toast.error("Each item must have at least 1 quantity"); return; }
+  if (hasDuplicate) {
+    toast.error("Duplicate items not allowed");
+    return;
+  }
 
-    try {
-      setSaving(true);
-      const newItems = items.filter((i) => !i._id);
-      const existingItems = items.filter((i) => i._id);
+  if (hasInvalid) {
+    toast.error("Each item must have at least 1 quantity");
+    return;
+  }
 
-      await Promise.all(
-        existingItems.map((item) =>
-          API.put(`/items/my-item/${item._id}`, {
-            itemType: item.itemType,
-            conditions: item.conditions,
-          })
-        )
-      );
+  try {
+    setSaving(true);
 
-      if (newItems.length > 0) {
-        await API.post("/items/setup", {
-          items: newItems.map((item) => ({
-            itemType: item.itemType,
-            conditions: item.conditions,
-          })),
-        });
-      }
+    const newItems = items.filter((i) => !i._id);
+    const existingItems = items.filter((i) => i._id);
 
-      await API.put("/settings/setup-complete");
+    // UPDATE EXISTING
+    await Promise.all(
+      existingItems.map((item) =>
+        API.put(`/items/my-item/${item._id}`, {
+          itemType: item.itemType,
+          conditions: item.conditions,
+        })
+      )
+    );
 
-      if (typeof refreshUser === "function") await refreshUser();
-
-      navigate("/dashboard", { replace: true });
-    } catch (error) {
-      console.log(error);
-      toast.error(error.response?.data?.message || "Failed to save inventory");
-    } finally {
-      setSaving(false);
+    // CREATE NEW
+    if (newItems.length > 0) {
+      await API.post("/items/setup", {
+        items: newItems.map((item) => ({
+          itemType: item.itemType,
+          conditions: item.conditions,
+        })),
+      });
     }
-  };
+
+    // COMPLETE SETUP
+    await API.put("/settings/setup-complete");
+
+    toast.success("Inventory saved successfully");
+
+    // NAVIGATE IMMEDIATELY
+    navigate("/dashboard/requisition", {
+      replace: true,
+    });
+
+    // OPTIONAL BACKGROUND REFRESH
+    if (typeof refreshUser === "function") {
+      refreshUser();
+    }
+
+  } catch (error) {
+    console.log(error);
+
+    toast.error(
+      error.response?.data?.message ||
+      "Failed to save inventory"
+    );
+  } finally {
+    setSaving(false);
+  }
+};
 
   if (authLoading || loading) {
     return (
@@ -138,30 +162,23 @@ export default function SetupInventory() {
     <div className="flex min-h-screen flex-col bg-zinc-50">
 
       {/* Header */}
-      <div className="shrink-0 bg-gradient-to-r from-slate-700 via-slate-700 to-slate-600 text-white px-6 py-4 border-b border-slate-500/30">
-        <div className="max-w-2xl mx-auto flex flex-col gap-4 sm:flex-row sm:items-center sm:gap-6">
-          <button
-            type="button"
-            onClick={() => navigate(-1)}
-            className="inline-flex shrink-0 items-center gap-2 self-start rounded-lg bg-white/10 px-3 py-2 text-sm font-medium text-white ring-1 ring-inset ring-white/15 transition hover:bg-white/20"
-          >
-            <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
-            </svg>
-            Back
-          </button>
-          <div className="hidden h-10 w-px shrink-0 bg-white/20 sm:block" aria-hidden="true" />
-          <div className="min-w-0 flex-1">
-            <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-100/90 mb-1">
-              St. Joseph's College
-            </p>
-            <h1 className="text-xl font-semibold tracking-tight">Inventory Setup</h1>
-            <p className="text-zinc-300 text-sm mt-0.5">
-              {user?.department || "Your Department"} — record your department&apos;s current assets
-            </p>
-          </div>
-        </div>
-      </div>
+<div className="shrink-0 bg-white px-6 py-5 border-b border-zinc-200">
+  <div className="max-w-2xl mx-auto">
+
+    <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500 mb-1">
+      St. Joseph&apos;s College
+    </p>
+
+    <h1 className="text-2xl font-bold tracking-tight text-slate-800">
+      Inventory Setup
+    </h1>
+
+    <p className="text-zinc-500 text-sm mt-1">
+      {user?.department || "Your Department"} — record your department&apos;s current assets
+    </p>
+
+  </div>
+</div>
 
       <div className="flex flex-1 flex-col items-center px-4 py-10 sm:px-6">
         <div className="w-full max-w-2xl">

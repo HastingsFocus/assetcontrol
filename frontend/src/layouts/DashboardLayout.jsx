@@ -2,7 +2,7 @@ import { Outlet, useNavigate, useLocation } from "react-router-dom";
 import { useState, useEffect } from "react";
 import { useAuth } from "../context/AuthContext";
 import API from "../services/api";
-import socket from "../socket";
+import socket from "../services/socket";
 import LogoutButton from "../components/LogOutButton";
 
 export default function DashboardLayout() {

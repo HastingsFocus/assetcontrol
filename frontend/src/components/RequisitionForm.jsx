@@ -7,6 +7,7 @@ export default function RequisitionForm() {
   const { user } = useAuth();
 
   const [itemTypes, setItemTypes] = useState([]);
+  const [itemLibrary, setItemLibrary] = useState([]);
   const [loading, setLoading] = useState(false);
 
   const [form, setForm] = useState({
@@ -26,31 +27,29 @@ export default function RequisitionForm() {
   })();
 
   /* =========================
-     PRIORITY LABELS
+     FETCH LIBRARY
   ========================= */
-  const PRIORITY_OPTIONS = [
-    {
-      value: "very_important",
-      label: "Very Important",
-    },
-    {
-      value: "important",
-      label: "Important",
-    },
-    {
-      value: "not_important",
-      label: "Not Important",
-    },
-  ];
+  const fetchLibrary = async () => {
+    try {
+      const res = await API.get("/items/my-library");
+      setItemLibrary(res.data);
+    } catch (err) {
+      toast.error("Failed to load reusable items");
+    }
+  };
 
   /* =========================
-     FETCH ITEMS
+     LOAD DATA
   ========================= */
   useEffect(() => {
     const load = async () => {
       try {
-        const res = await API.get("/items/types");
-        setItemTypes(res.data);
+        await Promise.all([
+          API.get("/items/types").then((res) =>
+            setItemTypes(res.data)
+          ),
+          fetchLibrary(),
+        ]);
       } catch {
         toast.error("Failed to load items");
       }
@@ -60,7 +59,7 @@ export default function RequisitionForm() {
   }, [user]);
 
   /* =========================
-     UPDATE FORM
+     FORM HELPERS
   ========================= */
   const setField = (key, value) => {
     setForm((prev) => ({
@@ -80,20 +79,11 @@ export default function RequisitionForm() {
         (i) => i.itemType === itemTypeId
       );
 
-      // REMOVE ITEM
       if (!value || value <= 0) {
-        items = items.filter(
-          (i) => i.itemType !== itemTypeId
-        );
-      }
-
-      // UPDATE EXISTING
-      else if (index !== -1) {
+        items = items.filter((i) => i.itemType !== itemTypeId);
+      } else if (index !== -1) {
         items[index].quantity = Number(value);
-      }
-
-      // ADD NEW
-      else {
+      } else {
         items.push({
           itemType: itemTypeId,
           customItemName: null,
@@ -102,15 +92,12 @@ export default function RequisitionForm() {
         });
       }
 
-      return {
-        ...prev,
-        items,
-      };
+      return { ...prev, items };
     });
   };
 
   /* =========================
-     ADD CUSTOM ITEM
+     ADD CUSTOM ITEM (RESTORED 🔥)
   ========================= */
   const addCustom = () => {
     setForm((prev) => ({
@@ -127,12 +114,8 @@ export default function RequisitionForm() {
     }));
   };
 
-  /* =========================
-     UPDATE ITEM
-  ========================= */
   const updateItem = (index, field, value) => {
     const items = [...form.items];
-
     items[index][field] = value;
 
     setForm((prev) => ({
@@ -141,12 +124,8 @@ export default function RequisitionForm() {
     }));
   };
 
-  /* =========================
-     REMOVE ITEM
-  ========================= */
   const removeItem = (index) => {
     const items = [...form.items];
-
     items.splice(index, 1);
 
     setForm((prev) => ({
@@ -159,39 +138,27 @@ export default function RequisitionForm() {
      SUBMIT
   ========================= */
   const handleSubmit = async () => {
-    if (!form.requiredDate) {
+    if (!form.requiredDate)
       return toast.error("Select required date");
-    }
 
     const today = new Date();
     today.setHours(0, 0, 0, 0);
 
     const selectedDate = new Date(form.requiredDate);
 
-    if (selectedDate <= today) {
+    if (selectedDate <= today)
       return toast.error("Date must be in the future");
-    }
 
-    if (form.items.length === 0) {
+    if (form.items.length === 0)
       return toast.error("Add at least one item");
-    }
 
     for (const item of form.items) {
-      if (!item.quantity || item.quantity <= 0) {
+      if (!item.quantity || item.quantity <= 0)
         return toast.error("Invalid quantity");
-      }
 
-      if (!item.itemType && !item.customItemName) {
+      if (!item.itemType && !item.customItemName)
         return toast.error("Custom item name required");
-      }
     }
-
-    const cleanedItems = form.items.map((item) => ({
-      itemType: item.itemType || null,
-      customItemName: item.customItemName || null,
-      quantity: item.quantity,
-      description: item.description || "",
-    }));
 
     try {
       setLoading(true);
@@ -199,24 +166,20 @@ export default function RequisitionForm() {
       await API.post("/requests", {
         requiredDate: form.requiredDate,
         remarks: form.remarks,
-        priority: form.priority, // 🔥 WHOLE REQUEST PRIORITY
-        items: cleanedItems,
+        priority: form.priority,
+        items: form.items,
       });
 
-      toast.success("Requisition submitted successfully 🚀");
+      toast.success("Requisition submitted 🚀");
 
-      // RESET FORM
       setForm({
         requiredDate: "",
         remarks: "",
         priority: "important",
         items: [],
       });
-
     } catch (err) {
-      toast.error(
-        err.response?.data?.message || "Submission failed"
-      );
+      toast.error(err.response?.data?.message || "Failed");
     } finally {
       setLoading(false);
     }
@@ -231,66 +194,40 @@ export default function RequisitionForm() {
 
         {/* HEADER */}
         <div className="bg-white rounded-2xl shadow p-6">
+          <h1 className="text-3xl font-bold">New Requisition</h1>
 
-          <h1 className="text-3xl font-bold text-gray-800">
-            New Requisition
-          </h1>
+          <input
+            type="date"
+            min={minFutureDate}
+            value={form.requiredDate}
+            onChange={(e) =>
+              setField("requiredDate", e.target.value)
+            }
+            className="w-full border rounded-xl p-3 mt-4"
+          />
 
-          {/* REQUIRED DATE */}
-          <div className="mt-5">
-            <label className="block text-sm font-medium text-gray-600 mb-2">
-              Required Date
-            </label>
-
-            <input
-              type="date"
-              min={minFutureDate}
-              value={form.requiredDate}
-              onChange={(e) =>
-                setField("requiredDate", e.target.value)
-              }
-              className="w-full border rounded-xl p-3"
-            />
-          </div>
-
-          {/* REQUEST PRIORITY */}
-          <div className="mt-5">
-            <label className="block text-sm font-medium text-gray-600 mb-2">
-              Request Priority
-            </label>
-
-            <select
-              value={form.priority}
-              onChange={(e) =>
-                setField("priority", e.target.value)
-              }
-              className="w-full border rounded-xl p-3"
-            >
-              {PRIORITY_OPTIONS.map((option) => (
-                <option
-                  key={option.value}
-                  value={option.value}
-                >
-                  {option.label}
-                </option>
-              ))}
-            </select>
-
-            <p className="text-xs text-gray-500 mt-2">
-              This priority applies to the whole requisition.
-            </p>
-          </div>
+          <select
+            value={form.priority}
+            onChange={(e) =>
+              setField("priority", e.target.value)
+            }
+            className="w-full border rounded-xl p-3 mt-4"
+          >
+            <option value="very_important">Very Important</option>
+            <option value="important">Important</option>
+            <option value="not_important">Not Important</option>
+          </select>
         </div>
 
-        {/* PREDEFINED ITEMS */}
+        {/* PREDEFINED + REUSABLE */}
         <div className="bg-white rounded-2xl shadow p-6">
-
           <h2 className="text-lg font-semibold mb-4">
-            Department Items
+            Items
           </h2>
 
           <div className="grid md:grid-cols-2 gap-4">
 
+            {/* SYSTEM ITEMS */}
             {itemTypes.map((item) => {
               const existing = form.items.find(
                 (i) => i.itemType === item._id
@@ -299,30 +236,60 @@ export default function RequisitionForm() {
               return (
                 <div
                   key={item._id}
-                  className="border rounded-xl p-4 flex justify-between items-center"
+                  className="border p-4 rounded-xl flex justify-between"
                 >
-                  <div>
-                    <p className="font-semibold text-gray-800">
-                      {item.name}
-                    </p>
-
-                    <p className="text-xs text-gray-500">
-                      Predefined Item
-                    </p>
-                  </div>
+                  <p>
+                    {item.name}{" "}
+                    <span className="text-xs text-gray-400">
+                      System
+                    </span>
+                  </p>
 
                   <input
                     type="number"
                     min="0"
-                    placeholder="Qty"
                     value={existing?.quantity || ""}
                     onChange={(e) =>
-                      updatePredefined(
-                        item._id,
-                        e.target.value
-                      )
+                      updatePredefined(item._id, e.target.value)
                     }
-                    className="w-24 border rounded-lg p-2"
+                    className="w-24 border p-2 rounded"
+                  />
+                </div>
+              );
+            })}
+
+            {/* REUSABLE ITEMS */}
+            {itemLibrary.map((item) => {
+              const existing = form.items.find(
+                (i) => i.itemType === item._id
+              );
+
+              return (
+                <div
+                  key={item._id}
+                  className="border bg-green-50 p-4 rounded-xl flex justify-between"
+                >
+                  <p>
+                    {item.name}{" "}
+                    <span className="text-xs text-green-600">
+                      Reusable
+                    </span>
+
+                    {item.usageCount === 1 && (
+                      <span className="text-xs text-yellow-600 ml-2">
+                        New
+                      </span>
+                    )}
+                  </p>
+
+                  <input
+                    type="number"
+                    min="0"
+                    value={existing?.quantity || ""}
+                    onChange={(e) =>
+                      updatePredefined(item._id, e.target.value)
+                    }
+                    className="w-24 border p-2 rounded"
                   />
                 </div>
               );
@@ -330,42 +297,31 @@ export default function RequisitionForm() {
           </div>
         </div>
 
-        {/* CUSTOM ITEMS */}
+        {/* CUSTOM ITEMS (RESTORED FULL SECTION 🔥) */}
         <div className="bg-white rounded-2xl shadow p-6">
-
-          <div className="flex justify-between items-center mb-4">
-
-            <h2 className="text-lg font-semibold">
-              Custom Items
-            </h2>
+          <div className="flex justify-between mb-4">
+            <h2 className="font-semibold">Custom Items</h2>
 
             <button
               onClick={addCustom}
-              className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg"
+              className="bg-blue-600 text-white px-4 py-2 rounded-lg"
             >
               + Add Item
             </button>
           </div>
 
-          <div className="space-y-4">
-
+          <div className="space-y-3">
             {form.items
-              .map((item, index) => ({
-                ...item,
-                index,
-              }))
-              .filter((item) => !item.itemType)
+              .map((item, index) => ({ ...item, index }))
+              .filter((i) => !i.itemType)
               .map((item) => (
                 <div
                   key={item.index}
-                  className="grid md:grid-cols-4 gap-3 items-center border rounded-xl p-4"
+                  className="grid md:grid-cols-4 gap-3 border p-4 rounded-xl"
                 >
-
-                  {/* NAME */}
                   <input
-                    type="text"
                     placeholder="Item name"
-                    value={item.customItemName || ""}
+                    value={item.customItemName}
                     onChange={(e) =>
                       updateItem(
                         item.index,
@@ -373,13 +329,11 @@ export default function RequisitionForm() {
                         e.target.value
                       )
                     }
-                    className="border rounded-lg p-2"
+                    className="border p-2 rounded"
                   />
 
-                  {/* QTY */}
                   <input
                     type="number"
-                    min="1"
                     value={item.quantity}
                     onChange={(e) =>
                       updateItem(
@@ -388,14 +342,12 @@ export default function RequisitionForm() {
                         Number(e.target.value)
                       )
                     }
-                    className="border rounded-lg p-2"
+                    className="border p-2 rounded"
                   />
 
-                  {/* DESCRIPTION */}
                   <input
-                    type="text"
                     placeholder="Description"
-                    value={item.description || ""}
+                    value={item.description}
                     onChange={(e) =>
                       updateItem(
                         item.index,
@@ -403,15 +355,12 @@ export default function RequisitionForm() {
                         e.target.value
                       )
                     }
-                    className="border rounded-lg p-2"
+                    className="border p-2 rounded"
                   />
 
-                  {/* REMOVE */}
                   <button
-                    onClick={() =>
-                      removeItem(item.index)
-                    }
-                    className="text-red-600 hover:text-red-700 font-medium"
+                    onClick={() => removeItem(item.index)}
+                    className="text-red-600"
                   >
                     Remove
                   </button>
@@ -420,16 +369,13 @@ export default function RequisitionForm() {
           </div>
         </div>
 
-        
         {/* SUBMIT */}
         <button
           onClick={handleSubmit}
           disabled={loading}
-          className="w-full bg-gray-900 hover:bg-gray-800 text-white py-4 rounded-2xl font-semibold text-lg"
+          className="w-full bg-black text-white py-4 rounded-2xl"
         >
-          {loading
-            ? "Submitting..."
-            : "Submit Requisition"}
+          {loading ? "Submitting..." : "Submit Requisition"}
         </button>
       </div>
     </div>

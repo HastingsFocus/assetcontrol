@@ -4,6 +4,7 @@ import Notification from "../models/Notification.js";
 import ItemType from "../models/ItemType.js";
 import { sendNotification, io } from "../socket.js";
 import Item from "../models/Item.js";
+import ItemLibrary from "../models/ItemLibrary.js";
 
 // ===============================
 // 🔥 FORMAT HELPER
@@ -81,7 +82,7 @@ export const createRequest = async (req, res) => {
       requiredDate,
       items,
       remarks,
-      priority, // 🔥 WHOLE REQUEST PRIORITY
+      priority,
     } = req.body;
 
     // ================= VALIDATION =================
@@ -91,9 +92,12 @@ export const createRequest = async (req, res) => {
       });
     }
 
-    // 🔥 REQUEST PRIORITY VALIDATION
     if (
-      !["very_important", "important", "not_important"].includes(priority)
+      ![
+        "very_important",
+        "important",
+        "not_important",
+      ].includes(priority)
     ) {
       return res.status(400).json({
         message: "Invalid priority",
@@ -103,25 +107,33 @@ export const createRequest = async (req, res) => {
     const parsedDate = new Date(requiredDate);
     const today = new Date();
 
-    today.setHours(0, 0, 0, 0);
-    parsedDate.setHours(0, 0, 0, 0);
+    today.setHours(0,0,0,0);
+    parsedDate.setHours(0,0,0,0);
 
     if (Number.isNaN(parsedDate.getTime())) {
       return res.status(400).json({
-        message: "Invalid date",
+        message:"Invalid date"
       });
     }
 
     if (parsedDate <= today) {
       return res.status(400).json({
-        message: "Required date must be in future",
+        message:
+          "Required date must be in future"
       });
     }
 
     const validatedItems = [];
 
-    // ================= VALIDATE ITEMS =================
+
+    /*
+    ==================================
+    VALIDATE + TRACK ITEMS
+    ==================================
+    */
+
     for (const item of items) {
+
       const {
         itemType,
         customItemName,
@@ -129,114 +141,302 @@ export const createRequest = async (req, res) => {
         description,
       } = item;
 
+
       if (!quantity || quantity <= 0) {
         return res.status(400).json({
-          message: "Quantity must be greater than 0",
+          message:
+            "Quantity must be greater than 0",
         });
       }
+
 
       if (!itemType && !customItemName) {
         return res.status(400).json({
-          message: "Each item must have type or custom name",
+          message:
+            "Each item must have type or custom name",
         });
       }
 
-      // ================= PREDEFINED ITEM =================
+
+      /*
+      ==================================
+      PREDEFINED SYSTEM ITEM
+      ==================================
+      */
+
       if (itemType) {
-        const type = await ItemType.findById(itemType);
+
+        const type =
+          await ItemType.findById(
+            itemType
+          );
 
         if (!type) {
+
           return res.status(404).json({
-            message: "Item not found",
+            message:
+              "Item not found",
           });
+
         }
 
-        if (!type.departments.includes(req.user.department)) {
+
+        if (
+          !type.departments.includes(
+            req.user.department
+          )
+        ) {
+
           return res.status(403).json({
-            message: `${type.name} not allowed for your department`,
+            message:
+              `${type.name} not allowed for your department`,
           });
+
         }
 
+
         validatedItems.push({
-          itemType: type._id,
-          customItemName: null,
+
+          itemType:
+            type._id,
+
+          customItemName:
+            null,
+
           quantity,
-          description: description || "",
-          itemStatus: "pending",
-          approvedQuantity: 0,
+
+          description:
+            description || "",
+
+          itemStatus:
+            "pending",
+
+          approvedQuantity:
+            0,
         });
       }
 
-      // ================= CUSTOM ITEM =================
+
+
+      /*
+      ==================================
+      CUSTOM ITEM
+      ==================================
+      */
+
       else {
+
         validatedItems.push({
-          itemType: null,
+
+          itemType:
+            null,
+
           customItemName,
+
           quantity,
-          description: description || "",
-          itemStatus: "pending",
-          approvedQuantity: 0,
+
+          description:
+            description || "",
+
+          itemStatus:
+            "pending",
+
+          approvedQuantity:
+            0,
         });
+
+
+        /*
+        ==================================
+        TRACK ITEM LIBRARY
+        ==================================
+        */
+
+        const name =
+          customItemName.trim();
+
+
+        let existing =
+          await ItemLibrary.findOne({
+
+            user:
+              req.user._id,
+
+            name:
+              name,
+
+          });
+
+
+
+        // EXISTING ITEM
+        if (existing) {
+
+          existing.usageCount += 1;
+
+
+          if (
+            existing.usageCount >= 2
+          ) {
+
+            existing.isReusable =
+              true;
+
+          }
+
+
+          await existing.save();
+        }
+
+
+        // FIRST TIME ITEM
+        else {
+
+          await ItemLibrary.create({
+
+            user:
+              req.user._id,
+
+            name,
+
+            itemType:
+              null,
+
+            usageCount:
+              1,
+
+            isReusable:
+              false,
+
+            isApproved:
+              false,
+
+          });
+
+        }
+
       }
+
     }
 
-    // ================= CREATE REQUEST =================
-    const request = await Request.create({
-      user: req.user._id,
-      department: req.user.department,
 
-      requiredDate,
 
-      priority, // 🔥 SAVE REQUEST PRIORITY
+    /*
+    ==================================
+    CREATE REQUEST
+    ==================================
+    */
 
-      items: validatedItems,
+    const request =
+      await Request.create({
 
-      remarks: remarks || "",
+        user:
+          req.user._id,
 
-      status: "pending",
-    });
+        department:
+          req.user.department,
 
-    // ================= ADMIN NOTIFICATIONS =================
-    const admins = await User.find({
-      role: "admin",
-    }).select("_id");
+        requiredDate,
 
-    const notifications = admins.map((admin) => ({
-      user: admin._id,
+        priority,
 
-      message: `New requisition from ${req.user.department}`,
+        items:
+          validatedItems,
 
-      type: "request_created",
+        remarks:
+          remarks || "",
 
-      request: request._id,
-
-      department: request.department,
-    }));
-
-    const saved = await Notification.insertMany(notifications);
-
-    saved.forEach((n) => {
-      sendNotification(n.user.toString(), {
-        _id: n._id,
-        message: n.message,
-        type: n.type,
-        request: n.request,
-        department: n.department,
+        status:
+          "pending",
       });
+
+
+
+    /*
+    ==================================
+    ADMIN NOTIFICATIONS
+    ==================================
+    */
+
+    const admins =
+      await User.find({
+
+        role:
+          "admin",
+
+      }).select("_id");
+
+
+    const notifications =
+      admins.map(admin => ({
+
+        user:
+          admin._id,
+
+        message:
+          `New requisition from ${req.user.department}`,
+
+        type:
+          "request_created",
+
+        request:
+          request._id,
+
+        department:
+          request.department,
+
+      }));
+
+
+
+    const saved =
+      await Notification.insertMany(
+        notifications
+      );
+
+
+    saved.forEach((n)=>{
+
+      sendNotification(
+        n.user.toString(),
+
+        {
+          _id:n._id,
+          message:n.message,
+          type:n.type,
+          request:n.request,
+          department:n.department,
+        }
+
+      );
+
     });
+
+
 
     return res.status(201).json({
-      message: "Requisition submitted successfully",
 
-      request: formatRequest(request),
+      message:
+        "Requisition submitted successfully",
+
+      request:
+        formatRequest(request),
+
     });
 
-  } catch (err) {
+  }
+
+  catch(err){
+
     console.error(err);
 
     res.status(500).json({
-      message: "Server error",
+
+      message:
+        "Server error",
+
     });
+
   }
 };
 

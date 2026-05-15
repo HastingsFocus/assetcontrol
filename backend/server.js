@@ -10,6 +10,8 @@ import itemRoutes from "./routes/itemRoutes.js";
 import editAccessRoutes from "./routes/editAccessRoutes.js";
 import { initSocket } from "./socket.js";
 import settingsRoutes from "./routes/settingsRoutes.js";
+import itemLibraryRoutes from "./routes/itemLibraryRoutes.js";
+
 
 import seedItemTypes from "./seed/itemType.js";
 
@@ -42,7 +44,7 @@ app.use("/api/notifications", notificationRoutes);
 app.use("/api/items", itemRoutes);
 app.use("/api/edit-access", editAccessRoutes);
 app.use("/api/settings", settingsRoutes);
-
+app.use("/api/items", itemLibraryRoutes);
 app.get("/", (req, res) => {
   res.send("🚀 API Running...");
 });

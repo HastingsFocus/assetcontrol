@@ -156,8 +156,8 @@ export default function InventoryOverview() {
                   return (
                     <tr key={item._id} className="h-12 hover:bg-zinc-50 transition-colors">
                       <td className="px-5 py-3 text-center font-semibold text-zinc-800 truncate">
-                        {item.itemType?.name || "Unknown Item"}
-                      </td>
+  {item.itemType?.name || item.customItemName || "Unknown Item"}
+</td>
                       <td className="px-4 py-3 text-center">
                         <span className="text-green-700 font-semibold tabular-nums">{item.conditions?.good || 0}</span>
                       </td>

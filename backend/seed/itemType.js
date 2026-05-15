@@ -4,7 +4,7 @@ const seedItemTypes = async () => {
   try {
     const count = await ItemType.countDocuments();
 
-    // 🔥 Prevent reseeding every restart
+    
     if (count > 0) {
       console.log("⚡ Item types already exist, skipping seeding...");
       return;

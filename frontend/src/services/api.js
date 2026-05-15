@@ -1,11 +1,10 @@
 import axios from "axios";
 
 const API = axios.create({
-  baseURL: import.meta.env.VITE_API_URL,
+  baseURL: "http://localhost:5000/api", // 🔥 force local backend
 });
 
 API.interceptors.request.use((req) => {
-  // 🔥 use sessionStorage instead of localStorage
   const token = sessionStorage.getItem("token");
 
   if (token) {

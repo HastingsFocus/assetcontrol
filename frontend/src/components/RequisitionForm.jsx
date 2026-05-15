@@ -1,218 +1,437 @@
 import { useState, useEffect } from "react";
 import API from "../services/api";
 import { useAuth } from "../context/AuthContext";
-import { useNavigate } from "react-router-dom";
 import { toast } from "react-toastify";
 
 export default function RequisitionForm() {
   const { user } = useAuth();
-  const navigate = useNavigate();
 
   const [itemTypes, setItemTypes] = useState([]);
   const [loading, setLoading] = useState(false);
 
   const [form, setForm] = useState({
-    itemType: "",
     requiredDate: "",
-    quantity: "",
+    remarks: "",
     priority: "important",
+    items: [],
   });
+
+  /* =========================
+     MIN DATE
+  ========================= */
   const minFutureDate = (() => {
-    const tomorrow = new Date();
-    tomorrow.setDate(tomorrow.getDate() + 1);
-    return tomorrow.toISOString().split("T")[0];
+    const d = new Date();
+    d.setDate(d.getDate() + 1);
+    return d.toISOString().split("T")[0];
   })();
 
-  // =========================
-  // FETCH ITEM TYPES
-  // =========================
+  /* =========================
+     PRIORITY LABELS
+  ========================= */
+  const PRIORITY_OPTIONS = [
+    {
+      value: "very_important",
+      label: "Very Important",
+    },
+    {
+      value: "important",
+      label: "Important",
+    },
+    {
+      value: "not_important",
+      label: "Not Important",
+    },
+  ];
+
+  /* =========================
+     FETCH ITEMS
+  ========================= */
   useEffect(() => {
-    const fetchItemTypes = async () => {
+    const load = async () => {
       try {
         const res = await API.get("/items/types");
         setItemTypes(res.data);
-      } catch (err) {
-        console.log(err);
+      } catch {
         toast.error("Failed to load items");
       }
     };
-    if (user) fetchItemTypes();
+
+    if (user) load();
   }, [user]);
 
-  const handleChange = (e) => {
-    setForm({ ...form, [e.target.name]: e.target.value });
+  /* =========================
+     UPDATE FORM
+  ========================= */
+  const setField = (key, value) => {
+    setForm((prev) => ({
+      ...prev,
+      [key]: value,
+    }));
   };
 
-  // =========================
-  // SUBMIT
-  // =========================
-  const handleSubmit = async (e) => {
-    e.preventDefault();
+  /* =========================
+     PREDEFINED ITEMS
+  ========================= */
+  const updatePredefined = (itemTypeId, value) => {
+    setForm((prev) => {
+      let items = [...prev.items];
 
-    if (!form.itemType) { toast.error("Please select an item"); return; }
-    if (!form.requiredDate) { toast.error("Please select required date"); return; }
-    if (!form.quantity || Number(form.quantity) <= 0) { toast.error("Enter valid quantity"); return; }
-    const selectedDate = new Date(`${form.requiredDate}T00:00:00`);
+      const index = items.findIndex(
+        (i) => i.itemType === itemTypeId
+      );
+
+      // REMOVE ITEM
+      if (!value || value <= 0) {
+        items = items.filter(
+          (i) => i.itemType !== itemTypeId
+        );
+      }
+
+      // UPDATE EXISTING
+      else if (index !== -1) {
+        items[index].quantity = Number(value);
+      }
+
+      // ADD NEW
+      else {
+        items.push({
+          itemType: itemTypeId,
+          customItemName: null,
+          quantity: Number(value),
+          description: "",
+        });
+      }
+
+      return {
+        ...prev,
+        items,
+      };
+    });
+  };
+
+  /* =========================
+     ADD CUSTOM ITEM
+  ========================= */
+  const addCustom = () => {
+    setForm((prev) => ({
+      ...prev,
+      items: [
+        ...prev.items,
+        {
+          itemType: null,
+          customItemName: "",
+          quantity: 1,
+          description: "",
+        },
+      ],
+    }));
+  };
+
+  /* =========================
+     UPDATE ITEM
+  ========================= */
+  const updateItem = (index, field, value) => {
+    const items = [...form.items];
+
+    items[index][field] = value;
+
+    setForm((prev) => ({
+      ...prev,
+      items,
+    }));
+  };
+
+  /* =========================
+     REMOVE ITEM
+  ========================= */
+  const removeItem = (index) => {
+    const items = [...form.items];
+
+    items.splice(index, 1);
+
+    setForm((prev) => ({
+      ...prev,
+      items,
+    }));
+  };
+
+  /* =========================
+     SUBMIT
+  ========================= */
+  const handleSubmit = async () => {
+    if (!form.requiredDate) {
+      return toast.error("Select required date");
+    }
+
     const today = new Date();
     today.setHours(0, 0, 0, 0);
+
+    const selectedDate = new Date(form.requiredDate);
+
     if (selectedDate <= today) {
-      toast.error("Required date must be a future date");
-      return;
+      return toast.error("Date must be in the future");
     }
+
+    if (form.items.length === 0) {
+      return toast.error("Add at least one item");
+    }
+
+    for (const item of form.items) {
+      if (!item.quantity || item.quantity <= 0) {
+        return toast.error("Invalid quantity");
+      }
+
+      if (!item.itemType && !item.customItemName) {
+        return toast.error("Custom item name required");
+      }
+    }
+
+    const cleanedItems = form.items.map((item) => ({
+      itemType: item.itemType || null,
+      customItemName: item.customItemName || null,
+      quantity: item.quantity,
+      description: item.description || "",
+    }));
 
     try {
       setLoading(true);
-      const res = await API.post("/requests", {
-        ...form,
-        quantity: Number(form.quantity),
+
+      await API.post("/requests", {
+        requiredDate: form.requiredDate,
+        remarks: form.remarks,
+        priority: form.priority, // 🔥 WHOLE REQUEST PRIORITY
+        items: cleanedItems,
       });
 
-      toast.success("Request submitted successfully");
-      setForm({ itemType: "", requiredDate: "", quantity: "", priority: "important" });
-      console.log("✅ Request:", res.data);
+      toast.success("Requisition submitted successfully 🚀");
 
-    } catch (error) {
-      if (error.response?.data?.setupRequired) {
-        toast.error("Please setup inventory first");
-        navigate("/setup-inventory");
-        return;
-      }
-      toast.error(error.response?.data?.message || "Error submitting request");
+      // RESET FORM
+      setForm({
+        requiredDate: "",
+        remarks: "",
+        priority: "important",
+        items: [],
+      });
+
+    } catch (err) {
+      toast.error(
+        err.response?.data?.message || "Submission failed"
+      );
     } finally {
       setLoading(false);
     }
   };
 
-  const priorityOptions = [
-    { value: "very_important", label: "Very Important", color: "text-rose-700 border-rose-300 bg-rose-50", ring: "ring-rose-500" },
-    { value: "important", label: "Important", color: "text-orange-700 border-orange-300 bg-orange-50", ring: "ring-orange-500" },
-    { value: "not_important", label: "Not Important", color: "text-sky-700 border-sky-300 bg-sky-50", ring: "ring-sky-500" },
-  ];
-
+  /* =========================
+     UI
+  ========================= */
   return (
-      <div className="min-h-screen bg-zinc-50 flex justify-center px-4 pt-6 pb-10">
+    <div className="min-h-screen bg-gray-100 flex justify-center p-6">
+      <div className="w-full max-w-5xl space-y-6">
 
-    <div className="w-full max-w-xl">
-      <div className="bg-white rounded-2xl shadow-md shadow-zinc-900/6 border border-zinc-200/90 overflow-hidden ring-1 ring-zinc-100">
+        {/* HEADER */}
+        <div className="bg-white rounded-2xl shadow p-6">
 
-        {/* Card Header */}
-        <div className="bg-gradient-to-r from-slate-700 via-slate-700 to-slate-600 px-6 py-4 border-b border-slate-500/30">
-          <h2 className="text-white font-semibold text-lg tracking-tight">New Requisition</h2>
-          <p className="text-slate-100/90 text-sm mt-0.5">
-            Submit a request for items needed by your department
-          </p>
-        </div>
+          <h1 className="text-3xl font-bold text-gray-800">
+            New Requisition
+          </h1>
 
-        {/* Form Body */}
-        <div className="p-6 space-y-5 bg-white">
-
-          {/* Item Type */}
-          <div>
-            <label className="block text-sm font-medium text-zinc-700 mb-1.5">
-              Item Required <span className="text-red-500">*</span>
+          {/* REQUIRED DATE */}
+          <div className="mt-5">
+            <label className="block text-sm font-medium text-gray-600 mb-2">
+              Required Date
             </label>
+
+            <input
+              type="date"
+              min={minFutureDate}
+              value={form.requiredDate}
+              onChange={(e) =>
+                setField("requiredDate", e.target.value)
+              }
+              className="w-full border rounded-xl p-3"
+            />
+          </div>
+
+          {/* REQUEST PRIORITY */}
+          <div className="mt-5">
+            <label className="block text-sm font-medium text-gray-600 mb-2">
+              Request Priority
+            </label>
+
             <select
-              name="itemType"
-              value={form.itemType}
-              onChange={handleChange}
-              className="w-full px-4 py-2.5 border border-zinc-200 rounded-lg text-sm bg-white shadow-sm focus:outline-none focus:ring-2 focus:ring-slate-500/25 focus:border-slate-500/60 transition"
+              value={form.priority}
+              onChange={(e) =>
+                setField("priority", e.target.value)
+              }
+              className="w-full border rounded-xl p-3"
             >
-              <option value="">Select an item...</option>
-              {itemTypes.map((item) => (
-                <option key={item._id} value={item._id}>
-                  {item.name}
+              {PRIORITY_OPTIONS.map((option) => (
+                <option
+                  key={option.value}
+                  value={option.value}
+                >
+                  {option.label}
                 </option>
               ))}
             </select>
-          </div>
 
-          {/* Quantity */}
-          <div>
-            <label className="block text-sm font-medium text-zinc-700 mb-1.5">
-              Quantity <span className="text-red-500">*</span>
-            </label>
-            <input
-              type="number"
-              name="quantity"
-              placeholder="Enter quantity needed"
-              value={form.quantity}
-              onChange={handleChange}
-              min="1"
-              className="w-full px-4 py-2.5 border border-zinc-200 rounded-lg text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-slate-500/25 focus:border-slate-500/60 transition"
-            />
+            <p className="text-xs text-gray-500 mt-2">
+              This priority applies to the whole requisition.
+            </p>
           </div>
-
-          {/* Required Date */}
-          <div>
-            <label className="block text-sm font-medium text-zinc-700 mb-1.5">
-              Date Required <span className="text-red-500">*</span>
-            </label>
-            <input
-              type="date"
-              name="requiredDate"
-              value={form.requiredDate}
-              onChange={handleChange}
-              min={minFutureDate}
-              className="w-full px-4 py-2.5 border border-zinc-200 rounded-lg text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-slate-500/25 focus:border-slate-500/60 transition"
-            />
-          </div>
-
-          {/* Priority */}
-          <div>
-            <label className="block text-sm font-medium text-zinc-700 mb-2 text-center">
-              Priority Level
-            </label>
-            <div className="grid grid-cols-3 gap-3">
-              {priorityOptions.map((opt) => {
-                const isSelected = form.priority === opt.value;
-                return (
-                  <label
-                    key={opt.value}
-                    className={`border rounded-lg p-3 text-center cursor-pointer transition ${opt.color} ${
-                      isSelected
-                        ? `ring-2 ${opt.ring} shadow-sm`
-                        : "opacity-70 hover:opacity-100"
-                    }`}
-                  >
-                    <input
-                      type="radio"
-                      name="priority"
-                      value={opt.value}
-                      checked={isSelected}
-                      onChange={handleChange}
-                      className="hidden"
-                    />
-                    <span className="block text-xs font-semibold uppercase">{opt.label}</span>
-                  </label>
-                );
-              })}
-            </div>
-          </div>
-
-          {/* Submit */}
-          <button
-            type="button"
-            onClick={handleSubmit}
-            disabled={loading}
-            className="w-full bg-gradient-to-r from-slate-700 to-slate-600 hover:from-slate-600 hover:to-slate-500 disabled:opacity-60 text-white font-semibold py-3 rounded-lg shadow-lg shadow-slate-900/20 transition flex items-center justify-center gap-2"
-          >
-            {loading ? (
-              <>
-                <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                Submitting...
-              </>
-            ) : (
-              <>
-                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-                </svg>
-                Submit Request
-              </>
-            )}
-          </button>
         </div>
+
+        {/* PREDEFINED ITEMS */}
+        <div className="bg-white rounded-2xl shadow p-6">
+
+          <h2 className="text-lg font-semibold mb-4">
+            Department Items
+          </h2>
+
+          <div className="grid md:grid-cols-2 gap-4">
+
+            {itemTypes.map((item) => {
+              const existing = form.items.find(
+                (i) => i.itemType === item._id
+              );
+
+              return (
+                <div
+                  key={item._id}
+                  className="border rounded-xl p-4 flex justify-between items-center"
+                >
+                  <div>
+                    <p className="font-semibold text-gray-800">
+                      {item.name}
+                    </p>
+
+                    <p className="text-xs text-gray-500">
+                      Predefined Item
+                    </p>
+                  </div>
+
+                  <input
+                    type="number"
+                    min="0"
+                    placeholder="Qty"
+                    value={existing?.quantity || ""}
+                    onChange={(e) =>
+                      updatePredefined(
+                        item._id,
+                        e.target.value
+                      )
+                    }
+                    className="w-24 border rounded-lg p-2"
+                  />
+                </div>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* CUSTOM ITEMS */}
+        <div className="bg-white rounded-2xl shadow p-6">
+
+          <div className="flex justify-between items-center mb-4">
+
+            <h2 className="text-lg font-semibold">
+              Custom Items
+            </h2>
+
+            <button
+              onClick={addCustom}
+              className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg"
+            >
+              + Add Item
+            </button>
+          </div>
+
+          <div className="space-y-4">
+
+            {form.items
+              .map((item, index) => ({
+                ...item,
+                index,
+              }))
+              .filter((item) => !item.itemType)
+              .map((item) => (
+                <div
+                  key={item.index}
+                  className="grid md:grid-cols-4 gap-3 items-center border rounded-xl p-4"
+                >
+
+                  {/* NAME */}
+                  <input
+                    type="text"
+                    placeholder="Item name"
+                    value={item.customItemName || ""}
+                    onChange={(e) =>
+                      updateItem(
+                        item.index,
+                        "customItemName",
+                        e.target.value
+                      )
+                    }
+                    className="border rounded-lg p-2"
+                  />
+
+                  {/* QTY */}
+                  <input
+                    type="number"
+                    min="1"
+                    value={item.quantity}
+                    onChange={(e) =>
+                      updateItem(
+                        item.index,
+                        "quantity",
+                        Number(e.target.value)
+                      )
+                    }
+                    className="border rounded-lg p-2"
+                  />
+
+                  {/* DESCRIPTION */}
+                  <input
+                    type="text"
+                    placeholder="Description"
+                    value={item.description || ""}
+                    onChange={(e) =>
+                      updateItem(
+                        item.index,
+                        "description",
+                        e.target.value
+                      )
+                    }
+                    className="border rounded-lg p-2"
+                  />
+
+                  {/* REMOVE */}
+                  <button
+                    onClick={() =>
+                      removeItem(item.index)
+                    }
+                    className="text-red-600 hover:text-red-700 font-medium"
+                  >
+                    Remove
+                  </button>
+                </div>
+              ))}
+          </div>
+        </div>
+
+        
+        {/* SUBMIT */}
+        <button
+          onClick={handleSubmit}
+          disabled={loading}
+          className="w-full bg-gray-900 hover:bg-gray-800 text-white py-4 rounded-2xl font-semibold text-lg"
+        >
+          {loading
+            ? "Submitting..."
+            : "Submit Requisition"}
+        </button>
       </div>
-    </div>
     </div>
   );
 }

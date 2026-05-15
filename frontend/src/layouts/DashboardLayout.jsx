@@ -1,5 +1,5 @@
 import { Outlet, useNavigate, useLocation } from "react-router-dom";
-import { useState, useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useAuth } from "../context/AuthContext";
 import API from "../services/api";
 import socket from "../services/socket";
@@ -12,9 +12,6 @@ export default function DashboardLayout() {
 
   const [notifications, setNotifications] = useState([]);
 
-  // =========================
-  // NAV ITEMS (NEW CLEAN STRUCTURE)
-  // =========================
   const navItems = [
     { id: "requisition", label: "Place Requisition", path: "/dashboard/requisition" },
     { id: "requests", label: "My Requests", path: "/dashboard/my-requests" },
@@ -23,7 +20,7 @@ export default function DashboardLayout() {
   ];
 
   // =========================
-  // LOAD NOTIFICATIONS
+  // LOAD NOTIFICATIONS (ONCE)
   // =========================
   useEffect(() => {
     if (!user?._id) return;
@@ -38,87 +35,77 @@ export default function DashboardLayout() {
     };
 
     fetchNotifications();
-  }, [user]);
+  }, [user?._id]);
 
   // =========================
-  // SOCKET
+  // SOCKET (CLEAN SINGLE SETUP)
   // =========================
   useEffect(() => {
     if (!user?._id) return;
 
+    // connect once
+    if (!socket.connected) {
+      socket.connect();
+    }
+
     socket.emit("register", user._id);
+    console.log("📡 Socket registered:", user._id);
 
     const handleNotification = (data) => {
       setNotifications((prev) => {
         const exists = prev.some((n) => n._id === data._id);
-        if (exists) return prev;
-        return [data, ...prev];
+        return exists ? prev : [data, ...prev];
       });
     };
 
     socket.on("notification", handleNotification);
 
-    return () => socket.off("notification", handleNotification);
-  }, [user]);
+    return () => {
+      socket.off("notification", handleNotification);
+    };
+  }, [user?._id]);
 
   const unreadCount = notifications.filter((n) => !n.isRead).length;
 
   if (loading || !user) {
     return (
-      <div className="min-h-screen bg-zinc-50 flex items-center justify-center">
+      <div className="min-h-screen flex items-center justify-center">
         Loading...
       </div>
     );
   }
 
   return (
-    <div className="flex h-screen bg-zinc-100 overflow-hidden">
+    <div className="flex h-screen bg-zinc-100">
 
       {/* SIDEBAR */}
-      <aside className="w-64 bg-gradient-to-b from-slate-700 via-slate-600 to-slate-700 text-white flex flex-col border-r border-slate-300/30">
+      <aside className="w-64 bg-slate-700 text-white flex flex-col">
 
-        {/* Brand */}
-        <div className="px-6 py-5 border-b border-white/10">
-          <p className="text-[11px] font-semibold text-blue-200 uppercase tracking-[0.14em]">
-            St. Joseph's College
-          </p>
-          <h2 className="text-[15px] font-semibold text-white">
-            Procurement System
-          </h2>
+        <div className="p-4 border-b border-white/10">
+          <h2 className="font-bold">Procurement System</h2>
         </div>
 
-        {/* User */}
-        <div className="px-6 py-4 border-b border-white/10">
-          <p className="font-semibold text-sm">{user.name}</p>
-          <p className="text-xs text-slate-200">{user.email}</p>
-
-          {user.department && (
-            <span className="mt-2 inline-block text-xs bg-blue-500/20 text-blue-100 px-2 py-0.5 rounded">
-              {user.department}
-            </span>
-          )}
+        <div className="p-4 border-b border-white/10">
+          <p className="font-semibold">{user.name}</p>
+          <p className="text-xs">{user.email}</p>
         </div>
 
-        {/* NAV */}
-        <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto">
-
+        <nav className="flex-1 p-3 space-y-1">
           {navItems.map((item) => {
-            const isActive = location.pathname === item.path;
+            const active = location.pathname === item.path;
 
             return (
               <button
                 key={item.id}
                 onClick={() => navigate(item.path)}
-                className={`w-full flex items-center justify-between px-3 py-2.5 rounded-lg text-sm font-medium transition-all ${
-                  isActive
-                    ? "bg-blue-500 text-white shadow-lg ring-1 ring-blue-300/30"
-                    : "text-slate-200/80 hover:bg-slate-600/60 hover:text-white"
+                className={`w-full text-left p-2 rounded ${
+                  active ? "bg-blue-500" : "hover:bg-slate-600"
                 }`}
               >
-                <span>{item.label}</span>
+                {item.label}
 
                 {item.badge && unreadCount > 0 && (
-                  <span className="bg-amber-400 text-black text-[11px] font-semibold px-2 py-0.5 rounded-full">
+                  <span className="ml-2 bg-yellow-400 text-black px-2 rounded-full text-xs">
                     {unreadCount}
                   </span>
                 )}
@@ -127,18 +114,15 @@ export default function DashboardLayout() {
           })}
         </nav>
 
-        {/* LOGOUT */}
-        <div className="px-3 py-4 border-t border-slate-300/20">
+        <div className="p-3 border-t border-white/10">
           <LogoutButton />
         </div>
-
       </aside>
 
       {/* CONTENT */}
       <main className="flex-1 overflow-y-auto">
         <Outlet />
       </main>
-
     </div>
   );
 }

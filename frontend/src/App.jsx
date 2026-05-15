@@ -1,17 +1,14 @@
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
-import { useEffect } from "react";
 
-import API from "./services/api";
-import socket from "./services/socket";
 import { useAuth } from "./context/AuthContext";
 
-// 🔐 Guards
+// Guards
 import ProtectedDashboard from "./guards/ProtectedDashboards";
 
-// 🔥 Layout
+// Layout
 import DashboardLayout from "./layouts/DashboardLayout";
 
-// 🔔 Pages
+// Pages
 import Login from "./pages/Login";
 import Register from "./pages/Register";
 import Dashboard from "./pages/Dashboard";
@@ -19,75 +16,29 @@ import AdminDashboard from "./pages/admin/AdminDashboard";
 import SetUpInventory from "./pages/SetUpInventory";
 import EditInventory from "./pages/EditInventory";
 
-// 🔥 Components
+// Components
 import Notifications from "./components/Notifications";
 import RequisitionForm from "./components/RequisitionForm";
 import MyRequests from "./components/MyRequests";
 
-// 🔔 Toast
+// Toast
 import { ToastContainer } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 
 function App() {
-  const { user, token, login, logout } = useAuth();
-
-  // =========================
-  // SESSION RESTORE + SOCKET REGISTER
-  // =========================
-  useEffect(() => {
-    const loadUser = async () => {
-      if (!token) return;
-
-      try {
-        const res = await API.get("/auth/me");
-        const userData = res.data.user;
-
-        login({ user: userData, token });
-
-        if (userData?._id) {
-          socket.emit("register", userData._id.toString());
-        }
-      } catch (err) {
-        console.log("❌ Session expired");
-        logout();
-      }
-    };
-
-    loadUser();
-  }, [token, login, logout]);
-
-  // =========================
-  // GLOBAL SOCKET LISTENER
-  // =========================
-  useEffect(() => {
-    const handleNotification = (data) => {
-      console.log("🔥 GLOBAL SOCKET RECEIVED:", data);
-    };
-
-    socket.on("notification", handleNotification);
-
-    return () => {
-      socket.off("notification", handleNotification);
-    };
-  }, []);
+  const { user } = useAuth();
 
   return (
     <>
       <BrowserRouter>
         <Routes>
 
-          {/* =========================
-              PUBLIC ROUTES
-          ========================= */}
+          {/* PUBLIC */}
           <Route path="/" element={<Navigate to="/login" />} />
-          
           <Route path="/login" element={<Login />} />
-          
           <Route path="/register" element={<Register />} />
 
-          {/* =========================
-              DASHBOARD ROUTES
-          ========================= */}
+          {/* DASHBOARD */}
           <Route
             path="/dashboard"
             element={
@@ -96,40 +47,15 @@ function App() {
               </ProtectedDashboard>
             }
           >
-            {/* DEFAULT PAGE */}
             <Route index element={<Dashboard />} />
-
-            {/* USER ROUTES */}
-            <Route
-              path="requisition"
-              element={<RequisitionForm />}
-            />
-
-            <Route
-              path="my-requests"
-              element={<MyRequests />}
-            />
-
-            <Route
-              path="notifications"
-              element={<Notifications />}
-            />
-
-            {/* INVENTORY ROUTES */}
-            <Route
-              path="edit-inventory"
-              element={<EditInventory />}
-            />
-
-            <Route
-              path="setup-inventory"
-              element={<SetUpInventory />}
-            />
+            <Route path="requisition" element={<RequisitionForm />} />
+            <Route path="my-requests" element={<MyRequests />} />
+            <Route path="notifications" element={<Notifications />} />
+            <Route path="edit-inventory" element={<EditInventory />} />
+            <Route path="setup-inventory" element={<SetUpInventory />} />
           </Route>
 
-          {/* =========================
-              ADMIN ROUTE
-          ========================= */}
+          {/* ADMIN */}
           <Route
             path="/admin"
             element={
@@ -146,13 +72,7 @@ function App() {
         </Routes>
       </BrowserRouter>
 
-      {/* =========================
-          TOASTS
-      ========================= */}
-      <ToastContainer
-        position="top-right"
-        autoClose={3000}
-      />
+      <ToastContainer position="top-right" autoClose={3000} />
     </>
   );
 }

@@ -8,27 +8,25 @@ export const initSocket = (app) => {
 
   io = new Server(server, {
     cors: {
-      origin: "*", // ✅ TEMP FIX (we tighten later)
+      origin: "http://localhost:5173",
       methods: ["GET", "POST"],
       credentials: true,
     },
-    transports: ["websocket"], // ✅ VERY IMPORTANT
   });
 
   io.on("connection", (socket) => {
-    console.log("🟢 New client connected:", socket.id);
+    console.log("🟢 Socket connected:", socket.id);
 
     socket.on("register", (userId) => {
       if (!userId) return;
 
-      const id = userId.toString();
-      socket.join(id);
+      socket.join(userId.toString());
 
-      console.log("👤 User joined room:", id);
+      console.log(`👤 User joined room: ${userId}`);
     });
 
     socket.on("disconnect", () => {
-      console.log("🔴 Client disconnected:", socket.id);
+      console.log("🔴 Socket disconnected:", socket.id);
     });
   });
 

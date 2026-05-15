@@ -1,13 +1,11 @@
 import { io } from "socket.io-client";
 
-const URL =
+const SOCKET_URL =
   import.meta.env.VITE_SOCKET_URL || "http://localhost:5000";
 
-console.log("🔌 SOCKET URL:", URL);
-
-const socket = io(URL, {
-  withCredentials: true,
-  transports: ["websocket"], // 🔥 important for Render
+const socket = io(SOCKET_URL, {
+  autoConnect: false, // ✅ important (we control connection manually)
+  transports: ["websocket"],
 });
 
 export default socket;

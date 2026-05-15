@@ -5,6 +5,19 @@ import { useAuth } from "../context/AuthContext";
 import { useNavigate } from "react-router-dom";
 import { toast } from "react-toastify";
 
+const getItemName = (item, index) => {
+  const custom = item.customItemName?.trim();
+  if (custom) return custom;
+
+  const typeName = item.itemType?.name || item.itemType;
+
+  if (typeof typeName === "string" && typeName.trim()) {
+    return typeName;
+  }
+
+  return `Item ${index + 1}`;
+};
+
 export default function EditInventory() {
   const { user, loading: authLoading } = useAuth();
   const navigate = useNavigate();
@@ -279,7 +292,7 @@ export default function EditInventory() {
                     <div className="flex items-center justify-between px-5 py-3 bg-zinc-50 border-b border-zinc-200">
                       <div className="flex items-center gap-2">
                         <span className="text-sm font-semibold text-zinc-600">
-                          {item.itemType?.name || item.itemType || `Item ${index + 1}`}
+                          {getItemName(item, index)}
                         </span>
                         {isDraft && (
                           <span className="text-[10px] font-bold uppercase tracking-wider px-1.5 py-0.5 bg-blue-100 text-blue-700 rounded">

@@ -6,50 +6,70 @@ const notificationSchema = new mongoose.Schema(
       type: mongoose.Schema.Types.ObjectId,
       ref: "User",
       required: true,
+      index: true,
     },
 
     message: {
       type: String,
       required: true,
+      trim: true,
     },
 
+    // =========================
+    // NOTIFICATION TYPE
+    // =========================
     type: {
       type: String,
       enum: [
         "request_created",
+        "request_updated",
+        "request_approved",
+        "request_rejected",
         "status_updated",
         "edit_access_requested",
         "edit_access_decided",
+        "inventory_updated",
       ],
       default: "status_updated",
+      index: true,
     },
 
-    // 🔥 LINK TO REQUEST (VERY IMPORTANT)
+    // =========================
+    // LINKS (FUTURE PROOFING)
+    // =========================
     request: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "Request",
-      required: false, // optional but useful
     },
 
-    // 🔗 LINK TO EDIT REQUEST (for inventory edit-access notifications)
     editRequest: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "EditRequest",
-      required: false,
     },
+
+    // =========================
+    // CONTEXT INFO
+    // =========================
     department: {
+      type: String,
+      index: true,
+    },
+
+    itemName: {
       type: String,
     },
 
-    // 🔴 FOR UNREAD COUNT
+    // =========================
+    // READ STATUS
+    // =========================
     isRead: {
       type: Boolean,
       default: false,
+      index: true,
     },
-
   },
   {
-    timestamps: true, // createdAt, updatedAt
+    timestamps: true,
   }
 );
 

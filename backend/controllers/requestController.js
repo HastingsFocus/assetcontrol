@@ -78,30 +78,14 @@ const computeRequestStatus = (items = []) => {
 // ===============================
 export const createRequest = async (req, res) => {
   try {
-    const {
-      requiredDate,
-      items,
-      remarks,
-      priority,
-    } = req.body;
+    const { requiredDate, items, remarks, priority } = req.body;
 
-    // ================= VALIDATION =================
     if (!requiredDate || !items || items.length === 0) {
-      return res.status(400).json({
-        message: "Required date and items are required",
-      });
+      return res.status(400).json({ message: "Required date and items are required" });
     }
 
-    if (
-      ![
-        "very_important",
-        "important",
-        "not_important",
-      ].includes(priority)
-    ) {
-      return res.status(400).json({
-        message: "Invalid priority",
-      });
+    if (!["very_important", "important", "not_important"].includes(priority)) {
+      return res.status(400).json({ message: "Invalid priority" });
     }
 
     const parsedDate = new Date(requiredDate);
@@ -111,332 +95,136 @@ export const createRequest = async (req, res) => {
     parsedDate.setHours(0,0,0,0);
 
     if (Number.isNaN(parsedDate.getTime())) {
-      return res.status(400).json({
-        message:"Invalid date"
-      });
+      return res.status(400).json({ message: "Invalid date" });
     }
 
     if (parsedDate <= today) {
-      return res.status(400).json({
-        message:
-          "Required date must be in future"
-      });
+      return res.status(400).json({ message: "Required date must be in future" });
     }
 
     const validatedItems = [];
 
-
-    /*
-    ==================================
-    VALIDATE + TRACK ITEMS
-    ==================================
-    */
-
     for (const item of items) {
-
-      const {
-        itemType,
-        customItemName,
-        quantity,
-        description,
-      } = item;
-
+      const { itemType, customItemName, quantity, description } = item;
 
       if (!quantity || quantity <= 0) {
-        return res.status(400).json({
-          message:
-            "Quantity must be greater than 0",
-        });
+        return res.status(400).json({ message: "Quantity must be greater than 0" });
       }
-
 
       if (!itemType && !customItemName) {
-        return res.status(400).json({
-          message:
-            "Each item must have type or custom name",
-        });
+        return res.status(400).json({ message: "Each item must have type or custom name" });
       }
 
+      // 🚨 STRICT SEPARATION (IMPORTANT FIX)
+      if (itemType && customItemName) {
+        return res.status(400).json({ message: "Item cannot be both predefined and custom" });
+      }
 
-      /*
-      ==================================
-      PREDEFINED SYSTEM ITEM
-      ==================================
-      */
-
+      // =========================
+      // PREDEFINED ITEM
+      // =========================
       if (itemType) {
-
-        const type =
-          await ItemType.findById(
-            itemType
-          );
+        const type = await ItemType.findById(itemType);
 
         if (!type) {
-
-          return res.status(404).json({
-            message:
-              "Item not found",
-          });
-
+          return res.status(404).json({ message: "Item not found" });
         }
 
-
-        if (
-          !type.departments.includes(
-            req.user.department
-          )
-        ) {
-
-          return res.status(403).json({
-            message:
-              `${type.name} not allowed for your department`,
-          });
-
+        if (!type.departments.includes(req.user.department)) {
+          return res.status(403).json({ message: `${type.name} not allowed for your department` });
         }
-
 
         validatedItems.push({
-
-          itemType:
-            type._id,
-
-          customItemName:
-            null,
-
+          itemType: type._id,
+          customItemName: null,
           quantity,
-
-          description:
-            description || "",
-
-          itemStatus:
-            "pending",
-
-          approvedQuantity:
-            0,
+          description: description || "",
+          itemStatus: "pending",
+          approvedQuantity: 0,
         });
       }
 
-
-
-      /*
-      ==================================
-      CUSTOM ITEM
-      ==================================
-      */
-
+      // =========================
+      // CUSTOM ITEM (NO DEPT CHECK)
+      // =========================
       else {
+        const name = customItemName.trim();
 
         validatedItems.push({
-
-          itemType:
-            null,
-
-          customItemName,
-
+          itemType: null,
+          customItemName: name,
           quantity,
-
-          description:
-            description || "",
-
-          itemStatus:
-            "pending",
-
-          approvedQuantity:
-            0,
+          description: description || "",
+          itemStatus: "pending",
+          approvedQuantity: 0,
         });
 
+        let existing = await ItemLibrary.findOne({
+          user: req.user._id,
+          name: name,
+        });
 
-        /*
-        ==================================
-        TRACK ITEM LIBRARY
-        ==================================
-        */
-
-        const name =
-          customItemName.trim();
-
-
-        let existing =
-          await ItemLibrary.findOne({
-
-            user:
-              req.user._id,
-
-            name:
-              name,
-
-          });
-
-
-
-        // EXISTING ITEM
         if (existing) {
-
           existing.usageCount += 1;
 
-
-          if (
-            existing.usageCount >= 2
-          ) {
-
-            existing.isReusable =
-              true;
-
+          if (existing.usageCount >= 2) {
+            existing.isReusable = true;
           }
 
-
           await existing.save();
-        }
-
-
-        // FIRST TIME ITEM
-        else {
-
+        } else {
           await ItemLibrary.create({
-
-            user:
-              req.user._id,
-
+            user: req.user._id,
             name,
-
-            itemType:
-              null,
-
-            usageCount:
-              1,
-
-            isReusable:
-              false,
-
-            isApproved:
-              false,
-
+            itemType: null,
+            usageCount: 1,
+            isReusable: false,
+            isApproved: false,
           });
-
         }
-
       }
-
     }
 
-
-
-    /*
-    ==================================
-    CREATE REQUEST
-    ==================================
-    */
-
-    const request =
-      await Request.create({
-
-        user:
-          req.user._id,
-
-        department:
-          req.user.department,
-
-        requiredDate,
-
-        priority,
-
-        items:
-          validatedItems,
-
-        remarks:
-          remarks || "",
-
-        status:
-          "pending",
-      });
-
-
-
-    /*
-    ==================================
-    ADMIN NOTIFICATIONS
-    ==================================
-    */
-
-    const admins =
-      await User.find({
-
-        role:
-          "admin",
-
-      }).select("_id");
-
-
-    const notifications =
-      admins.map(admin => ({
-
-        user:
-          admin._id,
-
-        message:
-          `New requisition from ${req.user.department}`,
-
-        type:
-          "request_created",
-
-        request:
-          request._id,
-
-        department:
-          request.department,
-
-      }));
-
-
-
-    const saved =
-      await Notification.insertMany(
-        notifications
-      );
-
-
-    saved.forEach((n)=>{
-
-      sendNotification(
-        n.user.toString(),
-
-        {
-          _id:n._id,
-          message:n.message,
-          type:n.type,
-          request:n.request,
-          department:n.department,
-        }
-
-      );
-
+    const request = await Request.create({
+      user: req.user._id,
+      department: req.user.department,
+      requiredDate,
+      priority,
+      items: validatedItems,
+      remarks: remarks || "",
+      status: "pending",
     });
 
+    const admins = await User.find({ role: "admin" }).select("_id");
 
+    const notifications = admins.map(admin => ({
+      user: admin._id,
+      message: `New requisition from ${req.user.department}`,
+      type: "request_created",
+      request: request._id,
+      department: request.department,
+    }));
+
+    const saved = await Notification.insertMany(notifications);
+
+    saved.forEach(n => {
+      sendNotification(n.user.toString(), {
+        _id: n._id,
+        message: n.message,
+        type: n.type,
+        request: n.request,
+        department: n.department,
+      });
+    });
 
     return res.status(201).json({
-
-      message:
-        "Requisition submitted successfully",
-
-      request:
-        formatRequest(request),
-
+      message: "Requisition submitted successfully",
+      request: formatRequest(request),
     });
 
-  }
-
-  catch(err){
-
+  } catch (err) {
     console.error(err);
-
-    res.status(500).json({
-
-      message:
-        "Server error",
-
-    });
-
+    return res.status(500).json({ message: "Server error" });
   }
 };
 
@@ -511,199 +299,137 @@ export const updateRequestStatus = async (req, res) => {
       .populate("user", "_id department");
 
     if (!request) {
-      return res.status(404).json({
-        message: "Request not found",
-      });
+      return res.status(404).json({ message: "Request not found" });
     }
 
     // =====================================================
     // PROCESS ITEMS
     // =====================================================
-    if (items && Array.isArray(items)) {
-
+    if (Array.isArray(items)) {
       for (const update of items) {
 
         const item = request.items.id(update._id);
-
         if (!item) continue;
 
-        // =====================================================
-        // PREVENT CHANGING APPROVED/REJECTED ITEMS
-        // =====================================================
-        if (
-          item.itemStatus === "approved" ||
-          item.itemStatus === "rejected"
-        ) {
-          continue;
-        }
+        if (["approved", "rejected"].includes(item.itemStatus)) continue;
 
-        // =====================================================
-        // UPDATE STATUS
-        // =====================================================
+        // =========================
+        // STATUS UPDATE
+        // =========================
         if (update.itemStatus) {
           item.itemStatus = update.itemStatus;
+
+          const itemName = item.itemType?.name || item.customItemName || "Item";
+
+          const isApproved = update.itemStatus === "approved";
+          const isRejected = update.itemStatus === "rejected";
+
+          const notificationMessage =
+            isApproved
+              ? `Your request for ${itemName} was approved`
+              : isRejected
+                ? `Your request for ${itemName} was rejected`
+                : `Your request for ${itemName} changed to ${update.itemStatus}`;
+
+          const notificationType =
+            isApproved
+              ? "request_approved"
+              : isRejected
+                ? "request_rejected"
+                : "status_updated";
+
+     
+
+          const notification = await Notification.create({
+            user: request.user._id,
+            message: notificationMessage,
+            type: notificationType,
+            request: request._id,
+            department: request.department,
+          });
+
+          io.to(request.user._id.toString()).emit("newNotification", {
+            _id: notification._id,
+            message: notification.message,
+            type: notification.type,
+            request: notification.request,
+            createdAt: notification.createdAt,
+          });
         }
 
-        // =====================================================
-        // UPDATE APPROVED QUANTITY
-        // =====================================================
-        if (update.approvedQuantity !== undefined) {
-
-          if (update.approvedQuantity < 0) {
-            return res.status(400).json({
-              message: "Invalid quantity",
-            });
-          }
-
-          if (update.approvedQuantity > item.quantity) {
-            return res.status(400).json({
-              message: "Too many items approved",
-            });
-          }
-
-          item.approvedQuantity =
-            update.approvedQuantity;
-        }
-
-        // =====================================================
-        // INVENTORY UPDATE
-        // =====================================================
+        // =========================
+        // APPROVAL INVENTORY FLOW
+        // =========================
         if (update.itemStatus === "approved") {
 
-          const qty =
-            update.approvedQuantity || item.quantity;
+          const qty = update.approvedQuantity || item.quantity;
 
-          let inventory;
+          let inventory = await Item.findOne({
+            itemType: item.itemType?._id || null,
+            customItemName: item.itemType ? "" : item.customItemName,
+            owner: request.user._id,
+            department: request.user.department,
+          });
 
-          // =====================================================
-          // PREDEFINED ITEM
-          // =====================================================
-          if (item.itemType) {
-
-            inventory = await Item.findOne({
-              itemType: item.itemType._id,
-              owner: request.user._id,
+          if (!inventory) {
+            inventory = await Item.create({
+              itemType: item.itemType?._id || null,
+              customItemName: item.itemType ? "" : item.customItemName,
               department: request.user.department,
+              owner: request.user._id,
+              conditions: { good: 0, fair: 0, poor: 0 },
+              lastUpdated: new Date(),
             });
-
-            // CREATE PREDEFINED INVENTORY
-            if (!inventory) {
-
-              inventory = await Item.create({
-
-                itemType: item.itemType._id,
-
-                customItemName: "",
-
-                department: request.user.department,
-
-                owner: request.user._id,
-
-                conditions: {
-                  good: 0,
-                  fair: 0,
-                  poor: 0,
-                },
-
-                lastUpdated: new Date(),
-              });
-
-            }
           }
 
-          // =====================================================
-          // CUSTOM ITEM
-          // =====================================================
-          else {
-
-            inventory = await Item.findOne({
-              customItemName: item.customItemName,
-              owner: request.user._id,
-              department: request.user.department,
-              itemType: null,
-            });
-
-            // CREATE CUSTOM INVENTORY
-            if (!inventory) {
-
-              inventory = await Item.create({
-
-                itemType: null,
-
-                customItemName:
-                  item.customItemName || "Custom Item",
-
-                department: request.user.department,
-
-                owner: request.user._id,
-
-                conditions: {
-                  good: 0,
-                  fair: 0,
-                  poor: 0,
-                },
-
-                lastUpdated: new Date(),
-              });
-
-            }
-          }
-
-          // =====================================================
-          // UPDATE STOCK
-          // =====================================================
           inventory.conditions.good += qty;
-
           inventory.lastUpdated = new Date();
-
           await inventory.save();
 
-          // =====================================================
-          // SOCKET UPDATE
-          // =====================================================
           io.emit("inventoryUpdated", {
-
-            itemType:
-              item.itemType?._id || null,
-
-            customItemName:
-              item.customItemName || null,
-
-            department:
-              request.user.department,
+            itemType: item.itemType?._id || null,
+            customItemName: item.customItemName || null,
+            department: request.user.department,
           });
+        }
+
+        // =========================
+        // QUANTITY UPDATE
+        // =========================
+        if (update.approvedQuantity !== undefined) {
+          if (update.approvedQuantity < 0)
+            return res.status(400).json({ message: "Invalid quantity" });
+
+          if (update.approvedQuantity > item.quantity)
+            return res.status(400).json({ message: "Too many items approved" });
+
+          item.approvedQuantity = update.approvedQuantity;
         }
       }
     }
 
     // =====================================================
-    // FINAL REQUEST STATUS
+    // FINAL STATUS FIX (IMPORTANT PART)
     // =====================================================
-    request.status =
-      computeRequestStatus(request.items);
+    request.markModified("items");
+
+    request.status = computeRequestStatus(request.items);
 
     const updated = await request.save();
 
-    // =====================================================
-    // RETURN UPDATED REQUEST
-    // =====================================================
     const populated = await Request.findById(updated._id)
       .populate("items.itemType", "name")
       .populate("user", "name email department");
 
-    res.json({
-      message: "Request updated",
+    return res.json({
+      message: "Request updated successfully",
       request: formatRequest(populated),
     });
 
   } catch (err) {
+    console.error("❌ updateRequestStatus error:", err);
 
-    console.error(
-      "❌ updateRequestStatus error:",
-      err
-    );
-
-    res.status(500).json({
+    return res.status(500).json({
       message: "Server error",
       error: err.message,
     });

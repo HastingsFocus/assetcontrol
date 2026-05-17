@@ -3,6 +3,9 @@ import Notification from "../models/Notification.js";
 // 🔔 Get notifications for logged-in user
 export const getNotifications = async (req, res) => {
   try {
+    
+
+    
     // 🔐 SAFETY CHECK
     if (!req.user || !req.user._id) {
       return res.status(401).json({

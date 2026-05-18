@@ -17,12 +17,14 @@ export default function useSetupCheck() {
       return;
     }
 
-    // 🔥 ADMIN ALWAYS PASSES
-    if (user.role === "admin") {
-      setIsSetup(true);
-      setChecking(false);
-      return;
-    }
+    if (
+  user.role === "admin" ||
+  user.role === "super_admin"
+) {
+  setIsSetup(true);
+  setChecking(false);
+  return;
+}
 
     // 🔥 FAST PATH
     if (user.inventorySetupComplete) {

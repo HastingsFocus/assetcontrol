@@ -1,22 +1,40 @@
-import { createContext, useContext, useEffect, useRef, useState } from "react";
+import {
+  createContext,
+  useContext,
+  useEffect,
+  useState,
+} from "react";
+
 import API from "../services/api";
 
 const AuthContext = createContext();
+
 export const useAuth = () => useContext(AuthContext);
 
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
-  const [token, setToken] = useState(sessionStorage.getItem("token"));
+  const [token, setToken] = useState(null);
   const [loading, setLoading] = useState(true);
 
-  const hasLoaded = useRef(false);
-
-  const loadUser = async () => {
+  // ==========================================
+  // Load user from token
+  // ==========================================
+  const loadUser = async (authToken) => {
     try {
-      const res = await API.get("/auth/me");
+      setLoading(true);
+
+      const res = await API.get("/auth/me", {
+        headers: {
+          Authorization: `Bearer ${authToken}`,
+        },
+      });
+
       setUser(res.data.user);
     } catch (err) {
-      console.log("❌ Auth failed");
+      console.error(
+        "❌ Auth failed:",
+        err.response?.data || err.message
+      );
 
       setUser(null);
       setToken(null);
@@ -26,34 +44,64 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
+  // ==========================================
+  // INIT: read token once on app start
+  // ==========================================
   useEffect(() => {
-    if (!token) {
+    const storedToken = sessionStorage.getItem("token");
+
+    if (!storedToken) {
       setLoading(false);
       return;
     }
 
-    if (hasLoaded.current) return;
+    setToken(storedToken);
+    loadUser(storedToken);
+  }, []);
 
-    hasLoaded.current = true;
-    loadUser();
-  }, [token]);
-
+  // ==========================================
+  // Login
+  // ==========================================
   const login = ({ token, user }) => {
+    console.log("LOGIN TOKEN:", token);
+    console.log("LOGIN USER:", user);
+
+    sessionStorage.setItem("token", token);
+
     setToken(token);
-    sessionStorage.setItem("token", token); // ✅ FIXED (consistent)
     setUser(user);
   };
 
+  // ==========================================
+  // Logout
+  // ==========================================
   const logout = () => {
-    setUser(null);
-    setToken(null);
-    hasLoaded.current = false;
     sessionStorage.removeItem("token");
+    setToken(null);
+    setUser(null);
+  };
+
+  // ==========================================
+  // Manual refresh
+  // ==========================================
+  const refreshUser = async () => {
+    const storedToken = sessionStorage.getItem("token");
+
+    if (!storedToken) return;
+
+    await loadUser(storedToken);
   };
 
   return (
     <AuthContext.Provider
-      value={{ user, token, loading, login, logout, refreshUser: loadUser }}
+      value={{
+        user,
+        token,
+        loading,
+        login,
+        logout,
+        refreshUser,
+      }}
     >
       {children}
     </AuthContext.Provider>

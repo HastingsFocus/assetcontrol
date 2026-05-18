@@ -2,6 +2,7 @@ import User from "../models/User.js";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import allowedUsers from "../config/allowedUsers.js";
+import { logAction } from "../services/activityService.js";
 
 // 🔐 Generate Token (FIXED)
 const generateToken = (user) => {
@@ -44,6 +45,9 @@ export const registerUser = async (req, res) => {
 
     const hashedPassword = await bcrypt.hash(password, 10);
 
+    // ==========================
+    // CREATE USER
+    // ==========================
     const user = await User.create({
       name,
       email,
@@ -53,8 +57,22 @@ export const registerUser = async (req, res) => {
       inventorySetupComplete: false,
     });
 
+    // ==========================
+    // 📜 LOG REGISTRATION
+    // ==========================
+    await logAction(
+      req,
+      "USER_REGISTERED",
+      user,
+      user._id,
+      {
+        department: user.department,
+      }
+    );
+
     return res.status(201).json({
       message: "Registration successful",
+
       user: {
         _id: user._id,
         name: user.name,
@@ -66,6 +84,8 @@ export const registerUser = async (req, res) => {
     });
 
   } catch (err) {
+    console.error("❌ Registration Error:", err);
+
     return res.status(500).json({
       message: "Server error during registration",
     });
@@ -108,9 +128,16 @@ export const loginUser = async (req, res) => {
       });
     }
 
-    console.log("✅ USER LOGGING IN:", user._id, user.role);
+     console.log("✅ USER LOGGING IN:", user._id, user.role);
 
-    const token = generateToken(user);
+await logAction(
+  req,"LOGIN", user, null,
+  {
+    department: user.department
+  }
+);
+
+const token = generateToken(user);
 
     console.log("🎟️ TOKEN GENERATED:", token);
 
@@ -171,5 +198,26 @@ export const getMe = async (req, res) => {
     return res.status(500).json({
       message: "Server error",
     });
+  }
+};
+
+export const logoutUser = async (req, res) => {
+  try {
+
+    await logAction(
+      req,
+      "LOGOUT"
+    );
+
+    res.json({
+      message: "Logout successful"
+    });
+
+  } catch(error){
+
+    res.status(500).json({
+      message:"Logout failed"
+    });
+
   }
 };

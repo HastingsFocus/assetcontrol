@@ -279,7 +279,7 @@ export default function AuthSplitPanel({
                     <input
                       type="email"
                       name="email"
-                      placeholder="you@example.ac"
+                      placeholder="department@stjoseph.ac.mw"
                       value={signinForm.email}
                       onChange={handleSigninChange}
                       required
@@ -326,7 +326,7 @@ export default function AuthSplitPanel({
                     <input
                       name="email"
                       type="email"
-                      placeholder="you@stjosephs.ac"
+                      placeholder="department@stjoseph.ac.mw"
                       value={signupForm.email}
                       onChange={handleSignupChange}
                       required

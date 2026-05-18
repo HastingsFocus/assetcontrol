@@ -11,6 +11,7 @@ import editAccessRoutes from "./routes/editAccessRoutes.js";
 import { initSocket } from "./socket.js";
 import settingsRoutes from "./routes/settingsRoutes.js";
 import itemLibraryRoutes from "./routes/itemLibraryRoutes.js";
+import adminRoutes from "./routes/adminRoutes.js";
 
 
 import seedItemTypes from "./seed/itemType.js";
@@ -48,7 +49,7 @@ app.use("/api/items", itemLibraryRoutes);
 app.get("/", (req, res) => {
   res.send("🚀 API Running...");
 });
-
+app.use("/api/admin", adminRoutes);
 // =========================
 // ⚡ SOCKET INIT
 // =========================

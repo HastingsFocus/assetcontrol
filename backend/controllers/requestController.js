@@ -5,6 +5,7 @@ import ItemType from "../models/ItemType.js";
 import { sendNotification, io } from "../socket.js";
 import Item from "../models/Item.js";
 import ItemLibrary from "../models/ItemLibrary.js";
+import { logAction } from "../services/activityService.js";
 
 // ===============================
 // 🔥 FORMAT HELPER
@@ -195,6 +196,19 @@ export const createRequest = async (req, res) => {
       status: "pending",
     });
 
+    await logAction(
+  req,
+  "REQUEST_CREATED",
+  null,
+  request._id,
+  {
+    department: req.user.department,
+    priority,
+    itemCount: validatedItems.length,
+    requiredDate,
+  }
+);
+
     const admins = await User.find({ role: "admin" }).select("_id");
 
     const notifications = admins.map(admin => ({
@@ -299,30 +313,47 @@ export const updateRequestStatus = async (req, res) => {
       .populate("user", "_id department");
 
     if (!request) {
-      return res.status(404).json({ message: "Request not found" });
+      return res.status(404).json({
+        message: "Request not found",
+      });
     }
 
     // =====================================================
     // PROCESS ITEMS
     // =====================================================
+
     if (Array.isArray(items)) {
       for (const update of items) {
 
         const item = request.items.id(update._id);
+
         if (!item) continue;
 
-        if (["approved", "rejected"].includes(item.itemStatus)) continue;
+        if (
+          ["approved", "rejected"]
+          .includes(item.itemStatus)
+        ) continue;
 
-        // =========================
+        // =====================================
         // STATUS UPDATE
-        // =========================
+        // =====================================
+
         if (update.itemStatus) {
-          item.itemStatus = update.itemStatus;
 
-          const itemName = item.itemType?.name || item.customItemName || "Item";
+          item.itemStatus =
+            update.itemStatus;
 
-          const isApproved = update.itemStatus === "approved";
-          const isRejected = update.itemStatus === "rejected";
+          const itemName =
+            item.itemType?.name ||
+            item.customItemName ||
+            "Item";
+
+          const isApproved =
+            update.itemStatus === "approved";
+
+          const isRejected =
+            update.itemStatus === "rejected";
+
 
           const notificationMessage =
             isApproved
@@ -331,6 +362,7 @@ export const updateRequestStatus = async (req, res) => {
                 ? `Your request for ${itemName} was rejected`
                 : `Your request for ${itemName} changed to ${update.itemStatus}`;
 
+
           const notificationType =
             isApproved
               ? "request_approved"
@@ -338,100 +370,369 @@ export const updateRequestStatus = async (req, res) => {
                 ? "request_rejected"
                 : "status_updated";
 
-     
 
-          const notification = await Notification.create({
-            user: request.user._id,
-            message: notificationMessage,
-            type: notificationType,
-            request: request._id,
-            department: request.department,
-          });
+          const notification =
+            await Notification.create({
 
-          io.to(request.user._id.toString()).emit("newNotification", {
-            _id: notification._id,
-            message: notification.message,
-            type: notification.type,
-            request: notification.request,
-            createdAt: notification.createdAt,
-          });
-        }
+              user:
+                request.user._id,
 
-        // =========================
-        // APPROVAL INVENTORY FLOW
-        // =========================
-        if (update.itemStatus === "approved") {
+              message:
+                notificationMessage,
 
-          const qty = update.approvedQuantity || item.quantity;
+              type:
+                notificationType,
 
-          let inventory = await Item.findOne({
-            itemType: item.itemType?._id || null,
-            customItemName: item.itemType ? "" : item.customItemName,
-            owner: request.user._id,
-            department: request.user.department,
-          });
+              request:
+                request._id,
 
-          if (!inventory) {
-            inventory = await Item.create({
-              itemType: item.itemType?._id || null,
-              customItemName: item.itemType ? "" : item.customItemName,
-              department: request.user.department,
-              owner: request.user._id,
-              conditions: { good: 0, fair: 0, poor: 0 },
-              lastUpdated: new Date(),
+              department:
+                request.department,
+
             });
+
+
+          io.to(
+            request.user._id.toString()
+          ).emit(
+
+            "newNotification",
+
+            {
+              _id:
+                notification._id,
+
+              message:
+                notification.message,
+
+              type:
+                notification.type,
+
+              request:
+                notification.request,
+
+              createdAt:
+                notification.createdAt,
+            }
+
+          );
+
+
+          // ====================================
+          // 📜 LOG APPROVED
+          // ====================================
+
+          if (isApproved) {
+
+            await logAction(
+
+              req,
+
+              "REQUEST_APPROVED",
+
+              null,
+
+              request._id,
+
+              {
+                department:
+                  request.department,
+
+                item:
+                  itemName,
+
+                approvedBy:
+                  req.user.email,
+              }
+
+            );
+
           }
 
+
+          // ====================================
+          // 📜 LOG REJECTED
+          // ====================================
+
+          if (isRejected) {
+
+            await logAction(
+
+              req,
+
+              "REQUEST_REJECTED",
+
+              null,
+
+              request._id,
+
+              {
+                department:
+                  request.department,
+
+                item:
+                  itemName,
+
+                rejectedBy:
+                  req.user.email,
+              }
+
+            );
+
+          }
+
+
+          // ====================================
+          // 📜 LOG UPDATED
+          // ====================================
+
+          if (
+            !isApproved &&
+            !isRejected
+          ) {
+
+            await logAction(
+
+              req,
+
+              "REQUEST_UPDATED",
+
+              null,
+
+              request._id,
+
+              {
+                department:
+                  request.department,
+
+                item:
+                  itemName,
+
+                updatedBy:
+                  req.user.email,
+
+                status:
+                  update.itemStatus,
+              }
+
+            );
+
+          }
+
+        }
+
+
+        // =====================================
+        // INVENTORY FLOW
+        // =====================================
+
+        if (
+          update.itemStatus === "approved"
+        ) {
+
+          const qty =
+            update.approvedQuantity
+            || item.quantity;
+
+
+          let inventory =
+            await Item.findOne({
+
+              itemType:
+                item.itemType?._id
+                || null,
+
+              customItemName:
+                item.itemType
+                  ? ""
+                  : item.customItemName,
+
+              owner:
+                request.user._id,
+
+              department:
+                request.user.department,
+
+            });
+
+
+          if (!inventory) {
+
+            inventory =
+              await Item.create({
+
+                itemType:
+                  item.itemType?._id
+                  || null,
+
+                customItemName:
+                  item.itemType
+                    ? ""
+                    : item.customItemName,
+
+                department:
+                  request.user.department,
+
+                owner:
+                  request.user._id,
+
+                conditions: {
+                  good:0,
+                  fair:0,
+                  poor:0
+                },
+
+                lastUpdated:
+                  new Date(),
+
+              });
+
+          }
+
+
           inventory.conditions.good += qty;
-          inventory.lastUpdated = new Date();
+
+          inventory.lastUpdated =
+            new Date();
+
           await inventory.save();
 
-          io.emit("inventoryUpdated", {
-            itemType: item.itemType?._id || null,
-            customItemName: item.customItemName || null,
-            department: request.user.department,
-          });
+
+          io.emit(
+
+            "inventoryUpdated",
+
+            {
+
+              itemType:
+                item.itemType?._id
+                || null,
+
+              customItemName:
+                item.customItemName
+                || null,
+
+              department:
+                request.user.department,
+
+            }
+
+          );
+
         }
 
-        // =========================
+
+        // =====================================
         // QUANTITY UPDATE
-        // =========================
-        if (update.approvedQuantity !== undefined) {
-          if (update.approvedQuantity < 0)
-            return res.status(400).json({ message: "Invalid quantity" });
+        // =====================================
 
-          if (update.approvedQuantity > item.quantity)
-            return res.status(400).json({ message: "Too many items approved" });
+        if (
+          update.approvedQuantity
+          !== undefined
+        ) {
 
-          item.approvedQuantity = update.approvedQuantity;
+          if (
+            update.approvedQuantity < 0
+          )
+
+            return res.status(400)
+              .json({
+
+                message:
+                  "Invalid quantity"
+
+              });
+
+
+          if (
+            update.approvedQuantity
+            > item.quantity
+          )
+
+            return res.status(400)
+              .json({
+
+                message:
+                  "Too many items approved"
+
+              });
+
+
+          item.approvedQuantity =
+            update.approvedQuantity;
+
         }
+
       }
+
     }
 
-    // =====================================================
-    // FINAL STATUS FIX (IMPORTANT PART)
-    // =====================================================
+
+    // ======================================
+    // FINAL STATUS UPDATE
+    // ======================================
+
     request.markModified("items");
 
-    request.status = computeRequestStatus(request.items);
+    request.status =
+      computeRequestStatus(
+        request.items
+      );
 
-    const updated = await request.save();
 
-    const populated = await Request.findById(updated._id)
-      .populate("items.itemType", "name")
-      .populate("user", "name email department");
+    const updated =
+      await request.save();
+
+
+    const populated =
+      await Request.findById(
+        updated._id
+      )
+
+      .populate(
+        "items.itemType",
+        "name"
+      )
+
+      .populate(
+        "user",
+        "name email department"
+      );
+
 
     return res.json({
-      message: "Request updated successfully",
-      request: formatRequest(populated),
+
+      message:
+        "Request updated successfully",
+
+      request:
+        formatRequest(
+          populated
+        ),
+
     });
 
-  } catch (err) {
-    console.error("❌ updateRequestStatus error:", err);
-
-    return res.status(500).json({
-      message: "Server error",
-      error: err.message,
-    });
   }
+
+  catch (err) {
+
+    console.error(
+      "❌ updateRequestStatus error:",
+      err
+    );
+
+
+    return res.status(500)
+      .json({
+
+        message:
+          "Server error",
+
+        error:
+          err.message,
+
+      });
+
+  }
+
 };

@@ -23,34 +23,24 @@ const protect = async (req, res, next) => {
   }
 
   try {
-    // =========================
-    // 🔐 VERIFY TOKEN
-    // =========================
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
 
-    // =========================
-    // 👤 FETCH FRESH USER FROM DB
-    // =========================
-    const user = await User.findById(decoded.id).select("-password");
+const user = await User.findById(decoded.id).select("-password");
 
-    if (!user) {
-      return res.status(401).json({
-        message: "User not found",
-      });
-    }
+if (!user) {
+  return res.status(401).json({
+    message: "User not found",
+  });
+}
 
-    // =========================
-    // 🔥 STANDARDIZED USER OBJECT
-    // =========================
-    req.user = {
-      id: user._id.toString(), // ✅ IMPORTANT FIX
-      _id: user._id,
-      name: user.name,
-      email: user.email,
-      role: user.role,
-      department: user.department,
-      inventorySetupComplete: user.inventorySetupComplete,
-    };
+// 🔥 MAKE IT CLEAN + CONSISTENT
+req.user = {
+  id: user._id.toString(),
+  email: user.email,
+  name: user.name,
+  role: user.role,
+  department: user.department,
+};
 
     next();
   } catch (err) {

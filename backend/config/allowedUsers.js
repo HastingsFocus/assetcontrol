@@ -1,4 +1,8 @@
 const allowedUsers = [
+  {
+    email: "systemadmin@stjoseph.ac.mw", role: "super_admin", department: "System"
+  },
+
   { email: "admin@stjoseph.ac.mw", role: "admin", department: "Administration" },
   { email: "ict@stjoseph.ac.mw", role: "hod", department: "ICT" },
   { email: "library@stjoseph.ac.mw", role: "hod", department: "Library" },

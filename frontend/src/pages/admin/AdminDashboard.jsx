@@ -9,7 +9,7 @@ import useNotifications from "../../hooks/useNotifications";
 import { useAuth } from "../../context/AuthContext";
 
 export default function AdminDashboard() {
-  const { user, loading } = useAuth();
+  const { user, loading, logout } = useAuth();
   const [active, setActive] = useState("assets");
   const { notifications, markAsRead } = useNotifications();
   const navigate = useNavigate();
@@ -73,10 +73,14 @@ export default function AdminDashboard() {
   }, [active, notifications, markAsRead]);
 
   const handleLogout = () => {
-    localStorage.clear();
-    socket.disconnect();
-    navigate("/login");
-  };
+  logout();
+
+  socket.disconnect();
+
+  navigate("/login", {
+    replace: true,
+  });
+};
 
   const handleViewRequest = (requestId) => {
     if (!requestId) return;

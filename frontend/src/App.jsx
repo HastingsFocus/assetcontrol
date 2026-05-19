@@ -7,7 +7,6 @@ import RoleGuard from "./guards/RoleGuard";
 
 // Layouts
 import DashboardLayout from "./layouts/DashboardLayout";
-import AdminLayout from "./layouts/AdminLayout";
 
 // USER PAGES
 import Login from "./pages/Login";
@@ -21,15 +20,10 @@ import Notifications from "./components/Notifications";
 import RequisitionForm from "./components/RequisitionForm";
 import MyRequests from "./components/MyRequests";
 
-// ADMIN PAGES
+// ADMIN
 import AdminDashboard from "./pages/admin/AdminDashboard";
-import Users from "./pages/admin/users/Users";
-import Requests from "./pages/admin/requests/Requests";
-import Logs from "./pages/admin/logs/Logs";
 
-// SUPER ADMIN DASHBOARD (optional separate page)
-import SuperAdminDashboard from "./pages/admin/dashboard/AdminDashboard";
-
+// TOAST
 import { ToastContainer } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 
@@ -40,9 +34,7 @@ function App() {
     <>
       <Routes>
 
-        {/* =========================
-            PUBLIC ROUTES
-        ========================= */}
+        {/* PUBLIC */}
         <Route path="/" element={<Navigate to="/login" />} />
 
         <Route
@@ -51,7 +43,7 @@ function App() {
             user ? (
               <Navigate
                 to={
-                  user.role === "admin" || user.role === "super_admin"
+                  user.role === "admin"
                     ? "/admin"
                     : "/dashboard"
                 }
@@ -64,9 +56,7 @@ function App() {
 
         <Route path="/register" element={<Register />} />
 
-        {/* =========================
-            USER SYSTEM
-        ========================= */}
+        {/* USER SYSTEM */}
         <Route
           path="/dashboard"
           element={
@@ -75,7 +65,7 @@ function App() {
             </ProtectedDashboard>
           }
         >
-          <Route index element={<Dashboard />} />
+          <Route index element={<RequisitionForm />} />
           <Route path="requisition" element={<RequisitionForm />} />
           <Route path="my-requests" element={<MyRequests />} />
           <Route path="notifications" element={<Notifications />} />
@@ -83,37 +73,17 @@ function App() {
           <Route path="setup-inventory" element={<SetUpInventory />} />
         </Route>
 
-        {/* =========================
-            ADMIN + SUPER ADMIN SYSTEM
-        ========================= */}
+        {/* ADMIN */}
         <Route
           path="/admin"
           element={
-            <RoleGuard allowedRoles={["admin", "super_admin"]}>
+            <RoleGuard allowedRoles={["admin"]}>
               <ProtectedDashboard>
-                <AdminLayout />
+                <AdminDashboard />
               </ProtectedDashboard>
             </RoleGuard>
           }
-        >
-          {/* default page */}
-          <Route
-            index
-            element={
-              <Navigate to="dashboard" replace />
-            }
-          />
-
-          {/* admin dashboard */}
-          <Route path="dashboard" element={<AdminDashboard />} />
-
-          {/* shared admin pages */}
-          <Route path="users" element={<Users />} />
-          <Route path="requests" element={<Requests />} />
-
-          {/* super admin only pages (you can guard inside component too) */}
-          <Route path="logs" element={<Logs />} />
-        </Route>
+        />
 
       </Routes>
 

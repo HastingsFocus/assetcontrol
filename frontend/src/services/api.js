@@ -5,7 +5,7 @@ const API = axios.create({
 });
 
 // Attach token automatically
-API.interceptors.request.use((req) => {
+API.interceptors.request.use((config) => {
   const token = sessionStorage.getItem("token");
 
   console.log("REQUEST TOKEN:", token);

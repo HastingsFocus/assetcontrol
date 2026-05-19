@@ -1,4 +1,4 @@
-import { NavLink, Outlet, useNavigate } from "react-router-dom";
+/*import { NavLink, Outlet, useNavigate } from "react-router-dom";
 
 export default function AdminLayout() {
   const user = JSON.parse(localStorage.getItem("user"));
@@ -13,16 +13,14 @@ export default function AdminLayout() {
   return (
     <div className="flex h-screen">
 
-      {/* =========================
-          SIDEBAR
-      ========================= */}
+      
       <div className="w-64 bg-gray-900 text-white p-4">
 
         <h2 className="text-xl font-bold mb-6">
           Super Admin Panel 👑
         </h2>
 
-        {/* DASHBOARD */}
+        
         <NavLink
           to="/super-admin/dashboard"
           className={({ isActive }) =>
@@ -34,7 +32,7 @@ export default function AdminLayout() {
           Dashboard
         </NavLink>
 
-        {/* USERS */}
+        
         <NavLink
           to="/super-admin/users"
           className={({ isActive }) =>
@@ -46,7 +44,7 @@ export default function AdminLayout() {
           Users
         </NavLink>
 
-        {/* REQUESTS */}
+        
         <NavLink
           to="/super-admin/requests"
           className={({ isActive }) =>
@@ -58,7 +56,7 @@ export default function AdminLayout() {
           Requests
         </NavLink>
 
-        {/* 👑 SUPER ADMIN ONLY */}
+        
         {user?.role === "super_admin" && (
           <>
             <NavLink
@@ -85,7 +83,7 @@ export default function AdminLayout() {
           </>
         )}
 
-        {/* LOGOUT */}
+        
         <button
           onClick={logout}
           className="mt-6 w-full bg-red-500 py-2 rounded"
@@ -95,9 +93,7 @@ export default function AdminLayout() {
 
       </div>
 
-      {/* =========================
-          MAIN CONTENT
-      ========================= */}
+     
       <div className="flex-1 bg-gray-100 p-6 overflow-auto">
 
         <Outlet />
@@ -106,4 +102,4 @@ export default function AdminLayout() {
 
     </div>
   );
-}
+}*/

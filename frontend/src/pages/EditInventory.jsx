@@ -2,7 +2,6 @@ import { useEffect, useState, useCallback } from "react";
 import API from "../services/api";
 import socket from "../socket";
 import { useAuth } from "../context/AuthContext";
-import { useNavigate } from "react-router-dom";
 import { toast } from "react-toastify";
 
 const getItemName = (item, index) => {
@@ -20,7 +19,6 @@ const getItemName = (item, index) => {
 
 export default function EditInventory() {
   const { user, loading: authLoading } = useAuth();
-  const navigate = useNavigate();
 
   const [items, setItems] = useState([]);
   const [itemTypes, setItemTypes] = useState([]);
@@ -239,9 +237,9 @@ export default function EditInventory() {
   // =========================
   if (authLoading || loading) {
     return (
-      <div className="min-h-screen bg-zinc-50 flex items-center justify-center">
+      <div className="flex items-center justify-center py-20">
         <div className="text-center">
-          <div className="w-10 h-10 border-4 border-slate-500 border-t-transparent rounded-full animate-spin mx-auto mb-3"></div>
+          <div className="w-10 h-10 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto mb-3"></div>
           <p className="text-zinc-500 text-sm">Loading inventory...</p>
         </div>
       </div>
@@ -249,11 +247,8 @@ export default function EditInventory() {
   }
 
   return (
-    <div className="flex min-h-screen flex-col bg-zinc-50">
-     
-
-      <div className="flex flex-1 flex-col items-center px-4 py-10 sm:px-6">
-        <div className="w-full max-w-2xl">
+    <div className="animate-[fadeIn_.3s_ease-out]">
+      <div className="mx-auto w-full max-w-2xl">
           {/* Edit access banner */}
           <AccessBanner
             mode={mode}
@@ -409,7 +404,6 @@ export default function EditInventory() {
             </svg>
             Add New Item
           </button>
-        </div>
       </div>
     </div>
   );

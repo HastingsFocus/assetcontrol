@@ -190,146 +190,248 @@ export default function RequisitionForm() {
   // =========================
   // UI
   // =========================
+  const selectedCount = form.items.length;
+  const customItems = form.items
+    .map((item, index) => ({ ...item, index }))
+    .filter((i) => !i.itemType && !i.libraryId);
+
+  const inputClass =
+    "w-full px-4 py-2.5 border border-zinc-200 rounded-lg text-sm bg-white shadow-sm text-zinc-900 placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-blue-500/25 focus:border-blue-500/60 transition";
+
   return (
-    <div className="min-h-screen bg-gray-100 flex justify-center p-6">
-      <div className="w-full max-w-5xl space-y-6">
+    <div className="space-y-6 animate-[fadeIn_.3s_ease-out]">
 
-        {/* HEADER */}
-        <div className="bg-white rounded-2xl shadow p-6">
-          <h1 className="text-3xl font-bold">New Requisition</h1>
+      {/* INTRO */}
+      <div>
+        <h2 className="text-xl font-bold tracking-tight text-zinc-900">New Requisition</h2>
+        <p className="text-sm text-zinc-500 mt-1">
+          Choose your items, set a required date and submit for approval.
+        </p>
+      </div>
 
-          <input
-            type="date"
-            min={minFutureDate}
-            value={form.requiredDate}
-            onChange={e => setField("requiredDate", e.target.value)}
-            className="w-full border rounded-xl p-3 mt-4"
-          />
+      {/* REQUEST DETAILS */}
+      <div className="bg-white rounded-2xl shadow-md shadow-zinc-900/6 border border-zinc-200/90 ring-1 ring-zinc-100 p-6">
+        <h3 className="text-sm font-semibold uppercase tracking-wide text-zinc-500 mb-4">
+          Request Details
+        </h3>
 
-          <select
-            value={form.priority}
-            onChange={e => setField("priority", e.target.value)}
-            className="w-full border rounded-xl p-3 mt-4"
-          >
-            <option value="very_important">Very Important</option>
-            <option value="important">Important</option>
-            <option value="not_important">Not Important</option>
-          </select>
+        <div className="grid sm:grid-cols-2 gap-4">
+          <div>
+            <label className="block text-sm font-medium text-zinc-700 mb-1.5">
+              Required Date
+            </label>
+            <input
+              type="date"
+              min={minFutureDate}
+              value={form.requiredDate}
+              onChange={(e) => setField("requiredDate", e.target.value)}
+              className={inputClass}
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-zinc-700 mb-1.5">
+              Priority
+            </label>
+            <select
+              value={form.priority}
+              onChange={(e) => setField("priority", e.target.value)}
+              className={inputClass}
+            >
+              <option value="very_important">Very Important</option>
+              <option value="important">Important</option>
+              <option value="not_important">Not Important</option>
+            </select>
+          </div>
         </div>
 
-        {/* ITEMS */}
-        <div className="bg-white rounded-2xl shadow p-6">
-          <h2 className="text-lg font-semibold mb-4">Items</h2>
+        <div className="mt-4">
+          <label className="block text-sm font-medium text-zinc-700 mb-1.5">
+            Remarks <span className="text-zinc-400 font-normal">(optional)</span>
+          </label>
+          <textarea
+            rows={2}
+            value={form.remarks}
+            onChange={(e) => setField("remarks", e.target.value)}
+            placeholder="Any additional notes for the approver…"
+            className={`${inputClass} resize-none`}
+          />
+        </div>
+      </div>
 
-          <div className="grid md:grid-cols-2 gap-4">
+      {/* CATALOGUE ITEMS */}
+      <div className="bg-white rounded-2xl shadow-md shadow-zinc-900/6 border border-zinc-200/90 ring-1 ring-zinc-100 p-6">
+        <h3 className="text-sm font-semibold uppercase tracking-wide text-zinc-500 mb-4">
+          Catalogue Items
+        </h3>
 
+        {itemTypes.length === 0 && itemLibrary.length === 0 ? (
+          <p className="text-sm text-zinc-400 py-2">No catalogue items available.</p>
+        ) : (
+          <div className="grid md:grid-cols-2 gap-3">
             {/* SYSTEM ITEMS */}
-            {itemTypes.map(item => {
-              const existing = form.items.find(i => i.itemType === item._id);
-
+            {itemTypes.map((item) => {
+              const existing = form.items.find((i) => i.itemType === item._id);
+              const active = !!existing?.quantity;
               return (
-                <div key={item._id} className="border p-4 rounded-xl flex justify-between">
-                  <p>{item.name} <span className="text-xs text-gray-400">System</span></p>
-
+                <div
+                  key={item._id}
+                  className={`flex items-center justify-between gap-3 border rounded-xl p-3.5 transition ${
+                    active
+                      ? "border-blue-300 bg-blue-50/60 ring-1 ring-blue-200"
+                      : "border-zinc-200 hover:border-zinc-300"
+                  }`}
+                >
+                  <div className="min-w-0">
+                    <p className="font-medium text-zinc-800 truncate">{item.name}</p>
+                    <span className="text-[11px] font-semibold uppercase tracking-wide text-zinc-400">
+                      System
+                    </span>
+                  </div>
                   <input
                     type="number"
                     min="0"
+                    placeholder="0"
                     value={existing?.quantity || ""}
-                    onChange={e => updateSystemItem(item._id, e.target.value)}
-                    className="w-24 border p-2 rounded"
+                    onChange={(e) => updateSystemItem(item._id, e.target.value)}
+                    className="w-20 border border-zinc-200 rounded-lg px-2 py-1.5 text-sm text-center font-semibold focus:outline-none focus:ring-2 focus:ring-blue-500/25 focus:border-blue-500/60 transition"
                   />
                 </div>
               );
             })}
 
             {/* REUSABLE ITEMS */}
-            {itemLibrary.map(item => {
-              const existing = form.items.find(i => i.libraryId === item._id);
-
+            {itemLibrary.map((item) => {
+              const existing = form.items.find((i) => i.libraryId === item._id);
+              const active = !!existing?.quantity;
               return (
-                <div key={item._id} className="border bg-green-50 p-4 rounded-xl flex justify-between">
-                  <p>{item.name} <span className="text-xs text-green-600">Reusable</span></p>
-
+                <div
+                  key={item._id}
+                  className={`flex items-center justify-between gap-3 border rounded-xl p-3.5 transition ${
+                    active
+                      ? "border-emerald-300 bg-emerald-50 ring-1 ring-emerald-200"
+                      : "border-emerald-200/70 bg-emerald-50/40 hover:border-emerald-300"
+                  }`}
+                >
+                  <div className="min-w-0">
+                    <p className="font-medium text-zinc-800 truncate">{item.name}</p>
+                    <span className="text-[11px] font-semibold uppercase tracking-wide text-emerald-600">
+                      Reusable
+                    </span>
+                  </div>
                   <input
                     type="number"
                     min="0"
+                    placeholder="0"
                     value={existing?.quantity || ""}
-                    onChange={e => updateLibraryItem(item._id, item.name, e.target.value)}
-                    className="w-24 border p-2 rounded"
+                    onChange={(e) => updateLibraryItem(item._id, item.name, e.target.value)}
+                    className="w-20 border border-emerald-200 rounded-lg px-2 py-1.5 text-sm text-center font-semibold focus:outline-none focus:ring-2 focus:ring-emerald-500/25 focus:border-emerald-500/60 transition"
                   />
                 </div>
               );
             })}
           </div>
+        )}
+      </div>
+
+      {/* CUSTOM ITEMS */}
+      <div className="bg-white rounded-2xl shadow-md shadow-zinc-900/6 border border-zinc-200/90 ring-1 ring-zinc-100 p-6">
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-sm font-semibold uppercase tracking-wide text-zinc-500">
+            Custom Items
+          </h3>
+          <button
+            onClick={addCustom}
+            className="inline-flex items-center gap-1.5 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold px-3.5 py-2 rounded-lg shadow-sm shadow-blue-900/15 transition"
+          >
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+            </svg>
+            Add Item
+          </button>
         </div>
 
-        {/* CUSTOM ITEMS */}
-        <div className="bg-white rounded-2xl shadow p-6">
-          <div className="flex justify-between mb-4">
-            <h2 className="font-semibold">Custom Items</h2>
-
-            <button
-              onClick={addCustom}
-              className="bg-blue-600 text-white px-4 py-2 rounded-lg"
-            >
-              + Add Item
-            </button>
-          </div>
-
+        {customItems.length === 0 ? (
+          <p className="text-sm text-zinc-400 py-2">
+            Need something not in the catalogue? Add a custom item.
+          </p>
+        ) : (
           <div className="space-y-3">
-            {form.items
-              .map((item, index) => ({ ...item, index }))
-              .filter(i => !i.itemType && !i.libraryId)
-              .map(item => (
-                <div key={item.index} className="grid md:grid-cols-4 gap-3 border p-4 rounded-xl">
-
-                  <input
-                    placeholder="Item name"
-                    value={item.customItemName}
-                    onChange={e =>
-                      updateCustomItem(item.index, "customItemName", e.target.value)
-                    }
-                    className="border p-2 rounded"
-                  />
-
-                  <input
-                    type="number"
-                    value={item.quantity}
-                    onChange={e =>
-                      updateCustomItem(item.index, "quantity", Number(e.target.value))
-                    }
-                    className="border p-2 rounded"
-                  />
-
-                  <input
-                    placeholder="Description"
-                    value={item.description}
-                    onChange={e =>
-                      updateCustomItem(item.index, "description", e.target.value)
-                    }
-                    className="border p-2 rounded"
-                  />
-
-                  <button
-                    onClick={() => removeItem(item.index)}
-                    className="text-red-600"
-                  >
-                    Remove
-                  </button>
-                </div>
-              ))}
+            {customItems.map((item) => (
+              <div
+                key={item.index}
+                className="grid grid-cols-1 sm:grid-cols-12 gap-3 border border-zinc-200 rounded-xl p-4 bg-zinc-50/40"
+              >
+                <input
+                  placeholder="Item name"
+                  value={item.customItemName}
+                  onChange={(e) =>
+                    updateCustomItem(item.index, "customItemName", e.target.value)
+                  }
+                  className={`sm:col-span-4 ${inputClass}`}
+                />
+                <input
+                  type="number"
+                  min="1"
+                  placeholder="Qty"
+                  value={item.quantity}
+                  onChange={(e) =>
+                    updateCustomItem(item.index, "quantity", Number(e.target.value))
+                  }
+                  className={`sm:col-span-2 ${inputClass}`}
+                />
+                <input
+                  placeholder="Description"
+                  value={item.description}
+                  onChange={(e) =>
+                    updateCustomItem(item.index, "description", e.target.value)
+                  }
+                  className={`sm:col-span-5 ${inputClass}`}
+                />
+                <button
+                  onClick={() => removeItem(item.index)}
+                  title="Remove item"
+                  className="sm:col-span-1 inline-flex items-center justify-center text-red-500 hover:text-white hover:bg-red-500 border border-red-200 hover:border-red-500 rounded-lg py-2.5 transition"
+                >
+                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                      d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                  </svg>
+                </button>
+              </div>
+            ))}
           </div>
+        )}
+      </div>
+
+      {/* SUBMIT BAR */}
+      <div className="sticky bottom-0 -mx-4 sm:-mx-6 lg:-mx-8 px-4 sm:px-6 lg:px-8 py-4 bg-gradient-to-t from-zinc-100 via-zinc-100/95 to-transparent">
+        <div className="flex items-center justify-between gap-4">
+          <p className="text-sm text-zinc-500">
+            <span className="font-semibold text-zinc-800">{selectedCount}</span>{" "}
+            item{selectedCount !== 1 ? "s" : ""} selected
+          </p>
+          <button
+            onClick={handleSubmit}
+            disabled={loading}
+            className="inline-flex items-center justify-center gap-2 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-500 hover:to-blue-600 disabled:opacity-60 disabled:cursor-not-allowed text-white font-semibold px-6 py-3 rounded-xl shadow-lg shadow-blue-900/20 transition"
+          >
+            {loading ? (
+              <>
+                <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                Submitting…
+              </>
+            ) : (
+              <>
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                    d="M5 13l4 4L19 7" />
+                </svg>
+                Submit Requisition
+              </>
+            )}
+          </button>
         </div>
-
-        {/* SUBMIT */}
-        <button
-          onClick={handleSubmit}
-          disabled={loading}
-          className="w-full bg-black text-white py-4 rounded-2xl"
-        >
-          {loading ? "Submitting..." : "Submit Requisition"}
-        </button>
-
       </div>
     </div>
   );

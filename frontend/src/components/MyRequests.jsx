@@ -59,7 +59,7 @@ export default function MyRequests() {
   }
 
   return (
-    <div className="space-y-6 animate-[fadeIn_.3s_ease-out]">
+    <div className="w-full max-w-5xl space-y-6">
 
       {/* HEADER */}
       <div>

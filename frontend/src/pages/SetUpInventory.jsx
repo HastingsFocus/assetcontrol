@@ -149,9 +149,9 @@ export default function SetupInventory() {
 
   if (authLoading || loading) {
     return (
-      <div className="flex items-center justify-center py-20">
+      <div className="min-h-screen bg-zinc-50 flex items-center justify-center">
         <div className="text-center">
-          <div className="w-10 h-10 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto mb-3"></div>
+          <div className="w-10 h-10 border-4 border-slate-500 border-t-transparent rounded-full animate-spin mx-auto mb-3"></div>
           <p className="text-zinc-500 text-sm">Loading inventory...</p>
         </div>
       </div>
@@ -159,18 +159,29 @@ export default function SetupInventory() {
   }
 
   return (
-    <div className="animate-[fadeIn_.3s_ease-out]">
-      <div className="mx-auto w-full max-w-2xl">
-        {/* Intro */}
-        <div className="mb-6">
-          <h2 className="text-xl font-bold tracking-tight text-slate-800">
-            Set up your inventory
-          </h2>
-          <p className="text-zinc-500 text-sm mt-1">
-            {user?.department || "Your Department"} — record your department&apos;s current assets.
-          </p>
-        </div>
+    <div className="flex min-h-screen flex-col bg-zinc-50">
 
+      {/* Header */}
+<div className="shrink-0 bg-white px-6 py-5 border-b border-zinc-200">
+  <div className="max-w-2xl mx-auto">
+
+    <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500 mb-1">
+      St. Joseph&apos;s College
+    </p>
+
+    <h1 className="text-2xl font-bold tracking-tight text-slate-800">
+      Inventory Setup
+    </h1>
+
+    <p className="text-zinc-500 text-sm mt-1">
+      {user?.department || "Your Department"} — record your department&apos;s current assets
+    </p>
+
+  </div>
+</div>
+
+      <div className="flex flex-1 flex-col items-center px-4 py-10 sm:px-6">
+        <div className="w-full max-w-2xl">
         {/* Info banner */}
         <div className="bg-slate-50/80 border border-slate-200/70 rounded-xl px-4 py-3 mb-6 flex gap-3 shadow-sm">
           <svg className="w-5 h-5 text-slate-600 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -296,6 +307,7 @@ export default function SetupInventory() {
             </>
           )}
         </button>
+        </div>
       </div>
     </div>
   );

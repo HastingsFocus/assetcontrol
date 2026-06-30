@@ -3,7 +3,6 @@ import { useNavigate } from "react-router-dom";
 import API from "../services/api";
 import { useAuth } from "../context/AuthContext";
 import { toast } from "react-toastify";
-import Logo from "./Logo";
 
 export default function AuthSplitPanel({
   initialMode = "signin",
@@ -248,14 +247,14 @@ export default function AuthSplitPanel({
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-200 via-zinc-100 to-slate-300 flex flex-col items-center justify-center px-4 py-8 sm:py-12">
-      <div className="w-full max-w-5xl mx-auto mb-7 flex flex-col items-center text-center">
-        <Logo variant="dark" size="lg" showText={false} />
-        <h1 className="mt-4 text-xl sm:text-2xl font-bold tracking-tight text-slate-900">
-          St Joseph&apos;s College of Health Sciences
-        </h1>
-        <p className="mt-1 text-sm font-medium uppercase tracking-[0.18em] text-blue-700/80">
-          Asset Management System
-        </p>
+      <div className="w-full max-w-5xl mx-auto mb-6 flex justify-center">
+        <img
+          src="/st-joseph-college-logo.png"
+          alt="St Joseph's College of Health Sciences"
+          className="w-full max-w-md h-auto object-contain object-center max-h-24 sm:max-h-28"
+          width={480}
+          height={120}
+        />
       </div>
 
       <div className="w-full max-w-5xl rounded-3xl overflow-hidden bg-white/80 backdrop-blur-sm shadow-2xl shadow-slate-900/20 ring-1 ring-white/60">
